@@ -2,6 +2,8 @@
 -- Run this ENTIRE script in Supabase Dashboard > SQL Editor > New Query
 
 -- Drop existing tables if re-running
+DROP TABLE IF EXISTS housekeeping CASCADE;
+DROP TABLE IF EXISTS extras CASCADE;
 DROP TABLE IF EXISTS payments CASCADE;
 DROP TABLE IF EXISTS reservations CASCADE;
 DROP TABLE IF EXISTS checkins CASCADE;
@@ -162,5 +164,23 @@ CREATE POLICY "allow_all" ON reservations FOR ALL USING (true) WITH CHECK (true)
 CREATE POLICY "allow_all" ON payments FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "allow_all" ON settings FOR ALL USING (true) WITH CHECK (true);
 
+CREATE TABLE housekeeping (
+  id SERIAL PRIMARY KEY,
+  room_id INTEGER NOT NULL REFERENCES rooms(id),
+  task_type TEXT NOT NULL DEFAULT 'cleaning',
+  priority TEXT DEFAULT 'normal',
+  status TEXT DEFAULT 'pending',
+  assigned_to INTEGER REFERENCES users(id),
+  notes TEXT,
+  created_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ
+);
+
 ALTER TABLE extras ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "allow_all" ON extras FOR ALL USING (true) WITH CHECK (true);
+
+ALTER TABLE housekeeping ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_all" ON housekeeping FOR ALL USING (true) WITH CHECK (true);
+

@@ -158,31 +158,33 @@ export default function Dashboard() {
           {/* Revenue by Method (admin) / Departures (reception) */}
           {isAdmin ? (
             <div className="card">
-              <h3 className="text-sm font-semibold text-gray-900 mb-4">Revenue by Method</h3>
+              <h3 className="text-sm font-semibold text-gray-900 mb-4">Revenue by Payment Method</h3>
               {Object.keys(methodTotals).length > 0 ? (
-                <div className="flex items-end gap-3 h-40">
-                  {/* Y-axis labels */}
-                  <div className="flex flex-col justify-between h-full text-[10px] text-gray-400 text-right pr-1 py-1">
+                <div className="flex items-end gap-3 h-48">
+                  <div className="flex flex-col justify-between h-full text-[10px] text-gray-400 text-right w-10 py-1">
                     {[maxRevenue, Math.round(maxRevenue * 0.75), Math.round(maxRevenue * 0.5), Math.round(maxRevenue * 0.25), 0].map((v, i) => (
-                      <span key={i}>{v >= 1000 ? `${Math.round(v / 1000)}k` : v}</span>
+                      <span key={i}>{v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${Math.round(v / 1000)}k` : v}</span>
                     ))}
                   </div>
-                  {/* Bars */}
-                  <div className="flex-1 flex items-end gap-2 h-full border-l border-b border-gray-200 pl-2 pb-1">
-                    {Object.entries(methodTotals).map(([label, amount]) => {
+                  <div className="flex-1 flex items-end gap-3 h-full border-l border-b border-gray-200 pl-3 pb-1 relative">
+                    {[0.25, 0.5, 0.75].map(p => (
+                      <div key={p} className="absolute left-0 right-0 border-t border-dashed border-gray-100" style={{ bottom: `${p * 100}%` }}></div>
+                    ))}
+                    {Object.entries(methodTotals).map(([label, amount], i) => {
                       const hPct = (amount / maxRevenue) * 100;
+                      const barColors = ['#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#ef4444', '#06b6d4'];
                       return (
-                        <div key={label} className="flex-1 flex flex-col items-center gap-1">
-                          <span className="text-[10px] text-gray-500 font-medium">{formatCurrency(amount)}</span>
-                          <div className="w-full bg-[#c9a84c] rounded-t" style={{ height: `${Math.max(hPct, 3)}%` }}></div>
-                          <span className="text-[11px] text-gray-600">{label}</span>
+                        <div key={label} className="flex-1 flex flex-col items-center gap-1.5 relative z-10">
+                          <span className="text-[10px] text-gray-600 font-semibold">{formatCurrency(amount)}</span>
+                          <div className="w-full rounded-t-md transition-all duration-500" style={{ height: `${Math.max(hPct, 4)}%`, backgroundColor: barColors[i % barColors.length] }}></div>
+                          <span className="text-[10px] text-gray-500 font-medium text-center leading-tight">{label}</span>
                         </div>
                       );
                     })}
                   </div>
                 </div>
               ) : (
-                <div className="h-40 flex items-center justify-center text-gray-400 text-sm">No payments recorded yet</div>
+                <div className="h-48 flex items-center justify-center text-gray-400 text-sm">No payments recorded yet</div>
               )}
             </div>
           ) : (

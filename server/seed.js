@@ -7,10 +7,10 @@ async function seed() {
   const salt = bcrypt.genSaltSync(10);
 
   const users = [
-    { username: 'admin', password: bcrypt.hashSync('admin123', salt), full_name: 'System Administrator', role: 'admin' },
-    { username: 'reception1', password: bcrypt.hashSync('reception123', salt), full_name: 'Maria Santos', role: 'receptionist' },
-    { username: 'reception2', password: bcrypt.hashSync('reception123', salt), full_name: 'James Ochieng', role: 'receptionist' },
-    { username: 'reception3', password: bcrypt.hashSync('reception123', salt), full_name: 'Amina Hassan', role: 'receptionist' },
+    { email: 'admin@terrassa.rw', password: bcrypt.hashSync('admin123', salt), full_name: 'System Administrator', role: 'admin' },
+    { email: 'maria@terrassa.rw', password: bcrypt.hashSync('reception123', salt), full_name: 'Maria Santos', role: 'receptionist' },
+    { email: 'james@terrassa.rw', password: bcrypt.hashSync('reception123', salt), full_name: 'James Ochieng', role: 'receptionist' },
+    { email: 'amina@terrassa.rw', password: bcrypt.hashSync('reception123', salt), full_name: 'Amina Hassan', role: 'receptionist' },
   ];
 
   const roomImages = {
@@ -46,8 +46,8 @@ async function seed() {
 
   console.log('Seeding users...');
   for (const u of users) {
-    try { await db.insert('users', u); console.log(`  + ${u.username}`); }
-    catch (e) { console.log(`  ~ ${u.username} (exists)`); }
+    try { await db.insert('users', u); console.log(`  + ${u.email}`); }
+    catch (e) { console.log(`  ~ ${u.email} (exists)`); }
   }
 
   console.log('Seeding rooms...');
@@ -73,8 +73,8 @@ async function seed() {
   console.log('  Senior Standard: 40,000 RWF (1 pax) / 50,000 RWF (2 pax)');
   console.log('  Deluxe:          50,000 RWF (1 pax) / 60,000 RWF (2 pax)');
   console.log('\nDefault credentials:');
-  console.log('  Admin:       admin / admin123');
-  console.log('  Reception 1: reception1 / reception123');
+  console.log('  Admin:       admin@terrassa.rw / admin123');
+  console.log('  Reception 1: maria@terrassa.rw / reception123');
 }
 
 seed().catch(err => { console.error('Seed error:', err); process.exit(1); });

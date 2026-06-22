@@ -20,7 +20,7 @@ const JWT_SECRET = config.JWT_SECRET;
 
 /**
  * Verify JWT token from Authorization header.
- * Sets req.user with decoded payload (id, username, role, shift_id).
+ * Sets req.user with decoded payload (id, email, role, shift_id).
  */
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];

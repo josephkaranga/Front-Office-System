@@ -82,7 +82,7 @@ async function initLocal() {
 
   // ── Schema: Create all tables if they don't exist ──
   const tables = [
-    `CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL, full_name TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'receptionist', is_active INTEGER DEFAULT 1, created_at TEXT DEFAULT (datetime('now')), last_login TEXT)`,
+    `CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE NOT NULL, password TEXT NOT NULL, full_name TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'receptionist', is_active INTEGER DEFAULT 1, created_at TEXT DEFAULT (datetime('now')), last_login TEXT)`,
     `CREATE TABLE IF NOT EXISTS shifts (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, login_time TEXT DEFAULT (datetime('now')), logout_time TEXT, FOREIGN KEY (user_id) REFERENCES users(id))`,
     `CREATE TABLE IF NOT EXISTS rooms (id INTEGER PRIMARY KEY AUTOINCREMENT, room_number TEXT UNIQUE NOT NULL, room_type TEXT NOT NULL, floor INTEGER NOT NULL, capacity INTEGER NOT NULL DEFAULT 2, rate_per_night REAL NOT NULL, rate_double REAL, status TEXT NOT NULL DEFAULT 'available', description TEXT, amenities TEXT, image_url TEXT)`,
     `CREATE TABLE IF NOT EXISTS guests (id INTEGER PRIMARY KEY AUTOINCREMENT, first_name TEXT NOT NULL, last_name TEXT NOT NULL, id_type TEXT, id_number TEXT, nationality TEXT, phone TEXT, email TEXT, address TEXT, vip_status TEXT DEFAULT 'regular', notes TEXT, registered_by INTEGER, created_at TEXT DEFAULT (datetime('now')))`,

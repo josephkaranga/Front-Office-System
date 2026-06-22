@@ -9,10 +9,10 @@ const router = express.Router();
 
 router.post('/login', loginLimiter, async (req, res) => {
   try {
-    const { username, password } = req.body;
-    if (!username || !password) return res.status(400).json({ error: 'Username and password are required.' });
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Email and password are required.' });
 
-    const user = await db.findOne('users', { username });
+    const user = await db.findOne('users', { email });
     if (!user) return res.status(401).json({ error: 'Invalid credentials.' });
     if (!user.is_active && user.is_active !== 1) return res.status(403).json({ error: 'Your account has been suspended. Contact the administrator.' });
     if (!bcrypt.compareSync(password, user.password)) return res.status(401).json({ error: 'Invalid credentials.' });
@@ -22,13 +22,13 @@ router.post('/login', loginLimiter, async (req, res) => {
     const shift = await db.insert('shifts', { user_id: user.id });
 
     const token = jwt.sign(
-      { id: user.id, username: user.username, full_name: user.full_name, role: user.role, shift_id: shift.id },
+      { id: user.id, email: user.email, full_name: user.full_name, role: user.role, shift_id: shift.id },
       JWT_SECRET, { expiresIn: '12h' }
     );
 
     res.json({
       token,
-      user: { id: user.id, username: user.username, full_name: user.full_name, role: user.role },
+      user: { id: user.id, email: user.email, full_name: user.full_name, role: user.role },
       shift_id: shift.id,
     });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Login failed.' }); }
@@ -105,11 +105,11 @@ router.get('/users/:id/shifts', authenticateToken, requireAdmin, async (req, res
     const userId = Number(req.params.id);
     const limit = Number(req.query.limit) || 30;
     if (db.isSB()) {
-      const { data } = await db.sb().from('shifts').select('*, users(full_name, username)').eq('user_id', userId).order('login_time', { ascending: false }).limit(limit);
-      const mapped = (data || []).map(s => ({ ...s, full_name: s.users?.full_name, username: s.users?.username, users: undefined }));
+      const { data } = await db.sb().from('shifts').select('*, users(full_name, email)').eq('user_id', userId).order('login_time', { ascending: false }).limit(limit);
+      const mapped = (data || []).map(s => ({ ...s, full_name: s.users?.full_name, email: s.users?.email, users: undefined }));
       res.json(mapped);
     } else {
-      res.json(db.local().prepare('SELECT s.*, u.full_name, u.username FROM shifts s JOIN users u ON s.user_id = u.id WHERE s.user_id = ? ORDER BY s.login_time DESC LIMIT ?').all(userId, limit));
+      res.json(db.local().prepare('SELECT s.*, u.full_name, u.email FROM shifts s JOIN users u ON s.user_id = u.id WHERE s.user_id = ? ORDER BY s.login_time DESC LIMIT ?').all(userId, limit));
     }
   } catch (err) { console.error(err); res.status(500).json({ error: 'Failed.' }); }
 });
@@ -131,14 +131,14 @@ router.put('/users/:id/status', authenticateToken, requireAdmin, async (req, res
 
 router.post('/users', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { username, password, full_name, role } = req.body;
-    if (!username || !password || !full_name) return res.status(400).json({ error: 'Username, password, and full name are required.' });
+    const { email, password, full_name, role } = req.body;
+    if (!email || !password || !full_name) return res.status(400).json({ error: 'Email, password, and full name are required.' });
     if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
     const salt = bcrypt.genSaltSync(10);
-    const user = await db.insert('users', { username, password: bcrypt.hashSync(password, salt), full_name, role: role || 'receptionist' });
-    res.status(201).json({ id: user.id, username, full_name, role: role || 'receptionist' });
+    const user = await db.insert('users', { email, password: bcrypt.hashSync(password, salt), full_name, role: role || 'receptionist' });
+    res.status(201).json({ id: user.id, email, full_name, role: role || 'receptionist' });
   } catch (err) {
-    if (err.message?.includes('unique') || err.message?.includes('UNIQUE') || err.code === '23505') return res.status(409).json({ error: 'Username already exists.' });
+    if (err.message?.includes('unique') || err.message?.includes('UNIQUE') || err.code === '23505') return res.status(409).json({ error: 'Email already exists.' });
     console.error(err); res.status(500).json({ error: 'Failed.' });
   }
 });
@@ -147,15 +147,15 @@ router.get('/shifts', authenticateToken, async (req, res) => {
   try {
     const { date, user_id } = req.query;
     if (db.isSB()) {
-      let q = db.sb().from('shifts').select('*, users(full_name, username)');
+      let q = db.sb().from('shifts').select('*, users(full_name, email)');
       if (req.user.role !== 'admin') q = q.eq('user_id', req.user.id);
       else if (user_id) q = q.eq('user_id', Number(user_id));
       if (date) { q = q.gte('login_time', date + 'T00:00:00').lte('login_time', date + 'T23:59:59'); }
       q = q.order('login_time', { ascending: false }).limit(50);
       const { data } = await q;
-      res.json((data || []).map(s => ({ ...s, full_name: s.users?.full_name, username: s.users?.username, users: undefined })));
+      res.json((data || []).map(s => ({ ...s, full_name: s.users?.full_name, email: s.users?.email, users: undefined })));
     } else {
-      let query = 'SELECT s.*, u.full_name, u.username FROM shifts s JOIN users u ON s.user_id = u.id';
+      let query = 'SELECT s.*, u.full_name, u.email FROM shifts s JOIN users u ON s.user_id = u.id';
       const conds = []; const params = [];
       if (req.user.role !== 'admin') { conds.push('s.user_id = ?'); params.push(req.user.id); }
       else if (user_id) { conds.push('s.user_id = ?'); params.push(Number(user_id)); }

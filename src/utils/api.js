@@ -68,7 +68,7 @@ class ApiClient {
   delete(endpoint) { return this.request(endpoint, { method: 'DELETE' }); }
 
   // ── Auth ──
-  login(username, password) { return this.post('/auth/login', { username, password }); }
+  login(email, password) { return this.post('/auth/login', { email, password }); }
   logout() { return this.post('/auth/logout', {}); }
   getMe() { return this.get('/auth/me'); }
   getUsers() { return this.get('/auth/users'); }

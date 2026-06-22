@@ -27,11 +27,12 @@ export function AuthProvider({ children }) {
     setLoading(false);
   }, []);
 
-  const login = async (username, password) => {
-    const data = await api.login(username, password);
+  const login = async (email, password) => {
+    const data = await api.login(email, password);
     api.setToken(data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
     setUser(data.user);
+    window.dispatchEvent(new Event('auth-login'));
     return data;
   };
 

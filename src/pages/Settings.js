@@ -17,7 +17,7 @@ export default function Settings() {
   const [showShiftModal, setShowShiftModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [userShifts, setUserShifts] = useState([]);
-  const [newUser, setNewUser] = useState({ username: '', password: '', full_name: '', role: 'receptionist' });
+  const [newUser, setNewUser] = useState({ email: '', password: '', full_name: '', role: 'receptionist' });
 
   useEffect(() => {
     setForm({ ...settings });
@@ -44,7 +44,7 @@ export default function Settings() {
     try {
       await api.createUser(newUser);
       setShowUserModal(false);
-      setNewUser({ username: '', password: '', full_name: '', role: 'receptionist' });
+      setNewUser({ email: '', password: '', full_name: '', role: 'receptionist' });
       loadUsers();
       flash('User created.');
     } catch (err) { setError(err.message); }
@@ -139,7 +139,7 @@ export default function Settings() {
                             </div>
                             <div>
                               <p className="font-medium text-gray-900">{u.full_name}</p>
-                              <p className="text-[11px] text-gray-500">@{u.username}</p>
+                              <p className="text-[11px] text-gray-500">{u.email}</p>
                             </div>
                           </div>
                         </td>
@@ -353,7 +353,7 @@ export default function Settings() {
         <Modal isOpen={showUserModal} onClose={() => setShowUserModal(false)} title="Add Staff Account" size="sm">
           <form onSubmit={handleCreateUser} className="space-y-3">
             <div><label className="label-field">Full Name *</label><input type="text" className="input-field" value={newUser.full_name} onChange={(e) => setNewUser(p => ({ ...p, full_name: e.target.value }))} required /></div>
-            <div><label className="label-field">Username *</label><input type="text" className="input-field" value={newUser.username} onChange={(e) => setNewUser(p => ({ ...p, username: e.target.value }))} required /></div>
+            <div><label className="label-field">Email *</label><input type="email" className="input-field" value={newUser.email} onChange={(e) => setNewUser(p => ({ ...p, email: e.target.value }))} required /></div>
             <div><label className="label-field">Password *</label><input type="password" className="input-field" value={newUser.password} onChange={(e) => setNewUser(p => ({ ...p, password: e.target.value }))} required /></div>
             <div>
               <label className="label-field">Role</label>
@@ -379,7 +379,7 @@ export default function Settings() {
                 </div>
                 <div>
                   <p className="font-medium text-gray-900">{selectedUser.full_name}</p>
-                  <p className="text-xs text-gray-500">@{selectedUser.username} &middot; {selectedUser.role} &middot; {selectedUser.total_shifts} total shifts</p>
+                  <p className="text-xs text-gray-500">{selectedUser.email} &middot; {selectedUser.role} &middot; {selectedUser.total_shifts} total shifts</p>
                 </div>
               </div>
 

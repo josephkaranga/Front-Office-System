@@ -63,31 +63,54 @@ const COUNTRY_PAYMENT_METHODS = {
 };
 
 export function SettingsProvider({ children }) {
-  const [settings, setSettings] = useState({
-    hotel_name: 'KYSHAKEZ',
-    hotel_tagline: 'Front Office System',
-    currency: 'KES',
-    country: 'Kenya',
+  const [settings, setSettings] = useState(() => {
+    const cached = localStorage.getItem('hotel_settings');
+    if (cached) {
+      try { return JSON.parse(cached); } catch (e) {}
+    }
+    return {
+      hotel_name: 'KYSHAKEZ',
+      hotel_tagline: 'Front Office System',
+      currency: 'KES',
+      country: 'Kenya',
+    };
   });
   const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
+  const loadSettings = () => {
     const token = localStorage.getItem('token');
     if (token) {
-      api.getSettings().then(s => { setSettings(s); setLoaded(true); }).catch(() => setLoaded(true));
+      api.getSettings().then(s => {
+        setSettings(s);
+        localStorage.setItem('hotel_settings', JSON.stringify(s));
+        setLoaded(true);
+      }).catch(() => setLoaded(true));
     } else {
       setLoaded(true);
     }
+  };
+
+  useEffect(() => { loadSettings(); }, []);
+
+  useEffect(() => {
+    const onLogin = () => loadSettings();
+    window.addEventListener('auth-login', onLogin);
+    return () => window.removeEventListener('auth-login', onLogin);
   }, []);
 
   const updateSettings = async (newSettings) => {
     const result = await api.updateSettings(newSettings);
     setSettings(result);
+    localStorage.setItem('hotel_settings', JSON.stringify(result));
     return result;
   };
 
   const refreshSettings = async () => {
-    try { const s = await api.getSettings(); setSettings(s); } catch (e) {}
+    try {
+      const s = await api.getSettings();
+      setSettings(s);
+      localStorage.setItem('hotel_settings', JSON.stringify(s));
+    } catch (e) {}
   };
 
   const formatCurrency = (amount) => {

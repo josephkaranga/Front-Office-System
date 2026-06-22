@@ -15,7 +15,7 @@ DROP TABLE IF EXISTS settings CASCADE;
 
 CREATE TABLE users (
   id SERIAL PRIMARY KEY,
-  username TEXT UNIQUE NOT NULL,
+  email TEXT UNIQUE NOT NULL,
   password TEXT NOT NULL,
   full_name TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'receptionist',

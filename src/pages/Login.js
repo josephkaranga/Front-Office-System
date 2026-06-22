@@ -5,7 +5,7 @@ import { useSettings } from '../context/SettingsContext';
 export default function Login() {
   const { login } = useAuth();
   const { settings } = useSettings();
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -14,7 +14,7 @@ export default function Login() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    try { await login(username, password); }
+    try { await login(email, password); }
     catch (err) { setError(err.message || 'Invalid credentials.'); }
     finally { setLoading(false); }
   };
@@ -67,9 +67,9 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="label-field">Username</label>
-              <input type="text" value={username} onChange={(e) => setUsername(e.target.value)}
-                className="input-field" placeholder="Enter username" required autoFocus />
+              <label className="label-field">Email</label>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                className="input-field" placeholder="Enter email" required autoFocus />
             </div>
             <div>
               <label className="label-field">Password</label>

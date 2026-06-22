@@ -18,6 +18,8 @@ export default function Settings() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [userShifts, setUserShifts] = useState([]);
   const [newUser, setNewUser] = useState({ email: '', password: '', full_name: '', role: 'receptionist' });
+  const [modalError, setModalError] = useState('');
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     setForm({ ...settings });
@@ -40,14 +42,17 @@ export default function Settings() {
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
-    setError('');
+    setModalError('');
+    setCreating(true);
     try {
       await api.createUser(newUser);
       setShowUserModal(false);
+      setModalError('');
       setNewUser({ email: '', password: '', full_name: '', role: 'receptionist' });
       loadUsers();
-      flash('User created.');
-    } catch (err) { setError(err.message); }
+      flash('Staff account created successfully.');
+    } catch (err) { setModalError(err.message || 'Failed to create user.'); }
+    finally { setCreating(false); }
   };
 
   const handleToggleStatus = async (user) => {
@@ -350,11 +355,12 @@ export default function Settings() {
         )}
 
         {/* Add User Modal */}
-        <Modal isOpen={showUserModal} onClose={() => setShowUserModal(false)} title="Add Staff Account" size="sm">
+        <Modal isOpen={showUserModal} onClose={() => { setShowUserModal(false); setModalError(''); }} title="Add Staff Account" size="sm">
           <form onSubmit={handleCreateUser} className="space-y-3">
+            {modalError && <div className="p-2.5 bg-red-50 border border-red-200 rounded text-red-700 text-xs">{modalError}</div>}
             <div><label className="label-field">Full Name *</label><input type="text" className="input-field" value={newUser.full_name} onChange={(e) => setNewUser(p => ({ ...p, full_name: e.target.value }))} required /></div>
             <div><label className="label-field">Email *</label><input type="email" className="input-field" value={newUser.email} onChange={(e) => setNewUser(p => ({ ...p, email: e.target.value }))} required /></div>
-            <div><label className="label-field">Password *</label><input type="password" className="input-field" value={newUser.password} onChange={(e) => setNewUser(p => ({ ...p, password: e.target.value }))} required /></div>
+            <div><label className="label-field">Password *</label><input type="password" className="input-field" minLength={6} value={newUser.password} onChange={(e) => setNewUser(p => ({ ...p, password: e.target.value }))} required /></div>
             <div>
               <label className="label-field">Role</label>
               <select className="select-field" value={newUser.role} onChange={(e) => setNewUser(p => ({ ...p, role: e.target.value }))}>
@@ -363,8 +369,10 @@ export default function Settings() {
               </select>
             </div>
             <div className="flex gap-2 justify-end">
-              <button type="button" onClick={() => setShowUserModal(false)} className="btn-secondary">Cancel</button>
-              <button type="submit" className="btn-primary">Create</button>
+              <button type="button" onClick={() => { setShowUserModal(false); setModalError(''); }} className="btn-secondary">Cancel</button>
+              <button type="submit" disabled={creating} className="btn-primary disabled:opacity-50">
+                {creating ? 'Creating...' : 'Create'}
+              </button>
             </div>
           </form>
         </Modal>

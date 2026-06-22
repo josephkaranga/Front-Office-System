@@ -139,7 +139,7 @@ router.post('/users', authenticateToken, requireAdmin, async (req, res) => {
     res.status(201).json({ id: user.id, email, full_name, role: role || 'receptionist' });
   } catch (err) {
     if (err.message?.includes('unique') || err.message?.includes('UNIQUE') || err.code === '23505') return res.status(409).json({ error: 'Email already exists.' });
-    console.error(err); res.status(500).json({ error: 'Failed.' });
+    console.error('Create user error:', err); res.status(500).json({ error: err.message || 'Failed to create user.' });
   }
 });
 

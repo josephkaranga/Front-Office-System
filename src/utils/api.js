@@ -45,16 +45,14 @@ class ApiClient {
 
     const response = await fetch(url, { ...options, headers: { ...headers, ...options.headers } });
 
-    // Auto-logout on auth failure
-    if (response.status === 401 || response.status === 403) {
-      this.setToken(null);
-      window.location.href = '/';
-      throw new Error('Session expired');
-    }
-
     const data = await response.json();
 
     if (!response.ok) {
+      if ((response.status === 401 || response.status === 403) && !endpoint.includes('/auth/login')) {
+        this.setToken(null);
+        window.location.href = '/';
+        throw new Error('Session expired');
+      }
       throw new Error(data.error || 'Request failed');
     }
 

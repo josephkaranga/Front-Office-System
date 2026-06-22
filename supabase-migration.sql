@@ -76,6 +76,10 @@ CREATE TABLE checkins (
   checked_in_by INTEGER REFERENCES users(id),
   checked_out_by INTEGER REFERENCES users(id),
   special_requests TEXT,
+  original_rate NUMERIC,
+  charged_rate NUMERIC,
+  discount_per_night NUMERIC DEFAULT 0,
+  discount_reason TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -138,11 +142,11 @@ CREATE INDEX idx_extras_checkin ON extras(checkin_id);
 
 -- Default settings
 INSERT INTO settings (key, value) VALUES
-  ('hotel_name', 'KYSHAKEZ'),
-  ('hotel_tagline', 'Front Office System'),
-  ('currency', 'KES'),
-  ('country', 'Kenya'),
-  ('timezone', 'Africa/Nairobi')
+  ('hotel_name', 'Terrassa Village'),
+  ('hotel_tagline', 'Hotel & Resort'),
+  ('currency', 'RWF'),
+  ('country', 'Rwanda'),
+  ('timezone', 'Africa/Kigali')
 ON CONFLICT (key) DO NOTHING;
 
 -- RLS: Allow full access (server-side auth via JWT, not Supabase auth)

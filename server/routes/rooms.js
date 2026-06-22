@@ -25,13 +25,8 @@ router.get('/', authenticateToken, async (req, res) => {
       query += ' ORDER BY room_number';
       rooms = db.local().prepare(query).all(...params);
     }
-    const stats = {
-      total: await db.count('rooms'),
-      available: await db.count('rooms', { status: 'available' }),
-      occupied: await db.count('rooms', { status: 'occupied' }),
-      maintenance: await db.count('rooms', { status: 'maintenance' }),
-      reserved: await db.count('rooms', { status: 'reserved' }),
-    };
+    const stats = { total: 0, available: 0, occupied: 0, maintenance: 0, reserved: 0, cleaning: 0 };
+    rooms.forEach(r => { stats.total++; if (stats[r.status] !== undefined) stats[r.status]++; });
     res.json({ rooms, stats });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Failed.' }); }
 });

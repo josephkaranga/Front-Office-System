@@ -6,40 +6,39 @@ const router = express.Router();
 
 router.get('/dashboard', authenticateToken, async (req, res) => {
   try {
-    const totalRooms = await db.count('rooms');
-    const occupied = await db.count('rooms', { status: 'occupied' });
-    const available = await db.count('rooms', { status: 'available' });
-    const maintenance = await db.count('rooms', { status: 'maintenance' });
-    const reserved = await db.count('rooms', { status: 'reserved' });
-
     const today = new Date().toISOString().split('T')[0];
     let todayCheckins = 0, todayCheckouts = 0, currentGuests = 0, todayRevenue = 0, monthRevenue = 0;
     let upcomingReservations = [], recentCheckins = [], expectedCheckouts = [];
+    let roomStats = { total: 0, occupied: 0, available: 0, maintenance: 0, reserved: 0 };
 
     if (db.isSB()) {
-      const { count: ci } = await db.sb().from('checkins').select('*', { count: 'exact', head: true }).gte('checkin_date', today + 'T00:00:00').lte('checkin_date', today + 'T23:59:59');
-      todayCheckins = ci || 0;
-      const { count: co } = await db.sb().from('checkins').select('*', { count: 'exact', head: true }).gte('checkout_date', today + 'T00:00:00').lte('checkout_date', today + 'T23:59:59');
-      todayCheckouts = co || 0;
-      currentGuests = await db.count('checkins', { status: 'checked_in' });
-
-      const { data: tPay } = await db.sb().from('payments').select('amount').gte('payment_date', today + 'T00:00:00').lte('payment_date', today + 'T23:59:59');
-      todayRevenue = (tPay || []).reduce((s, p) => s + Number(p.amount), 0);
-      const monthStart = today.slice(0, 7) + '-01';
-      const { data: mPay } = await db.sb().from('payments').select('amount').gte('payment_date', monthStart + 'T00:00:00');
-      monthRevenue = (mPay || []).reduce((s, p) => s + Number(p.amount), 0);
-
-      const { data: ur } = await db.sb().from('reservations').select('*, guests(first_name, last_name), rooms(room_number, room_type)').eq('status', 'confirmed').gte('checkin_date', today).order('checkin_date').limit(10);
-      upcomingReservations = (ur || []).map(r => ({ ...r, first_name: r.guests?.first_name, last_name: r.guests?.last_name, room_number: r.rooms?.room_number, room_type: r.rooms?.room_type, guests: undefined, rooms: undefined }));
-
-      const { data: rc } = await db.sb().from('checkins').select('*, guests(first_name, last_name, vip_status), rooms(room_number, room_type)').eq('status', 'checked_in').order('checkin_date', { ascending: false }).limit(10);
-      recentCheckins = (rc || []).map(c => ({ ...c, first_name: c.guests?.first_name, last_name: c.guests?.last_name, vip_status: c.guests?.vip_status, room_number: c.rooms?.room_number, room_type: c.rooms?.room_type, guests: undefined, rooms: undefined }));
-
       const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
-      const { data: ec } = await db.sb().from('checkins').select('*, guests(first_name, last_name, phone), rooms(room_number, room_type)').eq('status', 'checked_in').lte('expected_checkout', tomorrow.toISOString().split('T')[0]).order('expected_checkout');
-      expectedCheckouts = (ec || []).map(c => ({ ...c, first_name: c.guests?.first_name, last_name: c.guests?.last_name, phone: c.guests?.phone, room_number: c.rooms?.room_number, room_type: c.rooms?.room_type, guests: undefined, rooms: undefined }));
+      const monthStart = today.slice(0, 7) + '-01';
+
+      const [allRooms, ciRes, coRes, cgRes, tPayRes, mPayRes, urRes, rcRes, ecRes] = await Promise.all([
+        db.sb().from('rooms').select('status'),
+        db.sb().from('checkins').select('*', { count: 'exact', head: true }).gte('checkin_date', today + 'T00:00:00').lte('checkin_date', today + 'T23:59:59'),
+        db.sb().from('checkins').select('*', { count: 'exact', head: true }).gte('checkout_date', today + 'T00:00:00').lte('checkout_date', today + 'T23:59:59'),
+        db.sb().from('checkins').select('*', { count: 'exact', head: true }).eq('status', 'checked_in'),
+        db.sb().from('payments').select('amount').gte('payment_date', today + 'T00:00:00').lte('payment_date', today + 'T23:59:59'),
+        db.sb().from('payments').select('amount').gte('payment_date', monthStart + 'T00:00:00'),
+        db.sb().from('reservations').select('*, guests(first_name, last_name), rooms(room_number, room_type)').eq('status', 'confirmed').gte('checkin_date', today).order('checkin_date').limit(10),
+        db.sb().from('checkins').select('*, guests(first_name, last_name, vip_status), rooms(room_number, room_type)').eq('status', 'checked_in').order('checkin_date', { ascending: false }).limit(10),
+        db.sb().from('checkins').select('*, guests(first_name, last_name, phone), rooms(room_number, room_type)').eq('status', 'checked_in').lte('expected_checkout', tomorrow.toISOString().split('T')[0]).order('expected_checkout'),
+      ]);
+
+      (allRooms.data || []).forEach(r => { roomStats.total++; if (roomStats[r.status] !== undefined) roomStats[r.status]++; });
+      todayCheckins = ciRes.count || 0;
+      todayCheckouts = coRes.count || 0;
+      currentGuests = cgRes.count || 0;
+      todayRevenue = (tPayRes.data || []).reduce((s, p) => s + Number(p.amount), 0);
+      monthRevenue = (mPayRes.data || []).reduce((s, p) => s + Number(p.amount), 0);
+      upcomingReservations = (urRes.data || []).map(r => ({ ...r, first_name: r.guests?.first_name, last_name: r.guests?.last_name, room_number: r.rooms?.room_number, room_type: r.rooms?.room_type, guests: undefined, rooms: undefined }));
+      recentCheckins = (rcRes.data || []).map(c => ({ ...c, first_name: c.guests?.first_name, last_name: c.guests?.last_name, vip_status: c.guests?.vip_status, room_number: c.rooms?.room_number, room_type: c.rooms?.room_type, guests: undefined, rooms: undefined }));
+      expectedCheckouts = (ecRes.data || []).map(c => ({ ...c, first_name: c.guests?.first_name, last_name: c.guests?.last_name, phone: c.guests?.phone, room_number: c.rooms?.room_number, room_type: c.rooms?.room_type, guests: undefined, rooms: undefined }));
     } else {
       const l = db.local();
+      l.prepare("SELECT status FROM rooms").all().forEach(r => { roomStats.total++; if (roomStats[r.status] !== undefined) roomStats[r.status]++; });
       todayCheckins = l.prepare("SELECT COUNT(*) as c FROM checkins WHERE date(checkin_date) = date('now')").get().c;
       todayCheckouts = l.prepare("SELECT COUNT(*) as c FROM checkins WHERE date(checkout_date) = date('now')").get().c;
       currentGuests = l.prepare("SELECT COUNT(*) as c FROM checkins WHERE status = 'checked_in'").get().c;
@@ -51,11 +50,11 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
     }
 
     res.json({
-      rooms: { total: totalRooms, occupied, available, maintenance, reserved },
+      rooms: roomStats,
       today: { checkins: todayCheckins, checkouts: todayCheckouts, current_guests: currentGuests },
       revenue: { today: todayRevenue, month: monthRevenue },
       upcoming_reservations: upcomingReservations, recent_checkins: recentCheckins, expected_checkouts: expectedCheckouts,
-      occupancy_rate: totalRooms > 0 ? Math.round((occupied / totalRooms) * 100) : 0,
+      occupancy_rate: roomStats.total > 0 ? Math.round((roomStats.occupied / roomStats.total) * 100) : 0,
     });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Dashboard failed.' }); }
 });

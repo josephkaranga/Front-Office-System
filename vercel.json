@@ -14,9 +14,6 @@
     }
   },
   "env": {
-    "DB_MODE": "supabase",
-    "SUPABASE_URL": "@supabase_url",
-    "SUPABASE_KEY": "@supabase_key",
-    "JWT_SECRET": "@jwt_secret"
+    "DB_MODE": "supabase"
   }
 }

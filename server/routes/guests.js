@@ -59,10 +59,58 @@ router.get('/:id', authenticateToken, async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Failed.' }); }
 });
 
+router.post('/check-duplicate', authenticateToken, async (req, res) => {
+  try {
+    const { phone, id_number, first_name, last_name } = req.body;
+    let matches = [];
+    if (db.isSB()) {
+      const conditions = [];
+      if (phone) conditions.push(`phone.ilike.%${phone}%`);
+      if (id_number) conditions.push(`id_number.ilike.%${id_number}%`);
+      if (first_name && last_name) conditions.push(`and(first_name.ilike.%${first_name}%,last_name.ilike.%${last_name}%)`);
+      if (conditions.length === 0) return res.json({ duplicates: [] });
+      const { data } = await db.sb().from('guests').select('id, first_name, last_name, phone, id_number, nationality, email').or(conditions.join(',')).limit(5);
+      matches = data || [];
+    } else {
+      const conds = []; const params = [];
+      if (phone) { conds.push('g.phone LIKE ?'); params.push(`%${phone}%`); }
+      if (id_number) { conds.push('g.id_number LIKE ?'); params.push(`%${id_number}%`); }
+      if (first_name && last_name) { conds.push('(g.first_name LIKE ? AND g.last_name LIKE ?)'); params.push(`%${first_name}%`, `%${last_name}%`); }
+      if (conds.length === 0) return res.json({ duplicates: [] });
+      matches = db.local().prepare(`SELECT id, first_name, last_name, phone, id_number, nationality, email FROM guests g WHERE ${conds.join(' OR ')} LIMIT 5`).all(...params);
+    }
+    res.json({ duplicates: matches });
+  } catch (err) { console.error(err); res.json({ duplicates: [] }); }
+});
+
 router.post('/', authenticateToken, async (req, res) => {
   try {
-    const { first_name, last_name, id_type, id_number, nationality, phone, email, address, vip_status, notes } = req.body;
+    const { first_name, last_name, id_type, id_number, nationality, phone, email, address, vip_status, notes, force } = req.body;
     if (!first_name || !last_name) return res.status(400).json({ error: 'First name and last name are required.' });
+
+    if (!force) {
+      let duplicates = [];
+      if (db.isSB()) {
+        const conditions = [];
+        if (phone) conditions.push(`phone.eq.${phone}`);
+        if (id_number) conditions.push(`id_number.eq.${id_number}`);
+        if (conditions.length > 0) {
+          const { data } = await db.sb().from('guests').select('id, first_name, last_name, phone, id_number').or(conditions.join(',')).limit(3);
+          duplicates = data || [];
+        }
+      } else {
+        const conds = []; const params = [];
+        if (phone) { conds.push('phone = ?'); params.push(phone); }
+        if (id_number) { conds.push('id_number = ?'); params.push(id_number); }
+        if (conds.length > 0) {
+          duplicates = db.local().prepare(`SELECT id, first_name, last_name, phone, id_number FROM guests WHERE ${conds.join(' OR ')} LIMIT 3`).all(...params);
+        }
+      }
+      if (duplicates.length > 0) {
+        return res.status(409).json({ error: 'A guest with this phone or ID already exists.', duplicates });
+      }
+    }
+
     const guest = await db.insert('guests', { first_name, last_name, id_type: id_type || null, id_number: id_number || null, nationality: nationality || null, phone: phone || null, email: email || null, address: address || null, vip_status: vip_status || 'regular', notes: notes || null, registered_by: req.user.id });
     res.status(201).json(guest);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Failed.' }); }

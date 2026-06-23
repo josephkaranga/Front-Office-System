@@ -53,7 +53,9 @@ class ApiClient {
         window.location.href = '/';
         throw new Error('Session expired');
       }
-      throw new Error(data.error || 'Request failed');
+      const err = new Error(data.error || 'Request failed');
+      if (data.duplicates) err.duplicates = data.duplicates;
+      throw err;
     }
 
     return data;

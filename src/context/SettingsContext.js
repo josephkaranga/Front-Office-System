@@ -94,16 +94,31 @@ export function SettingsProvider({ children }) {
 
   useEffect(() => {
     document.title = `${settings.hotel_name || 'Hotel'} — Front Office`;
-    const link = document.querySelector("link[rel='icon']") || document.createElement('link');
-    link.rel = 'icon';
+    const setFavicon = (href, type) => {
+      const link = document.querySelector("link[rel='icon']") || document.createElement('link');
+      link.rel = 'icon';
+      link.type = type;
+      link.href = href;
+      if (!link.parentNode) document.head.appendChild(link);
+    };
     if (settings.hotel_logo) {
-      link.href = settings.hotel_logo;
-      link.type = settings.hotel_logo.startsWith('data:image/png') ? 'image/png' : 'image/x-icon';
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 64;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+        const scale = Math.min(64 / img.width, 64 / img.height);
+        const w = img.width * scale;
+        const h = img.height * scale;
+        ctx.drawImage(img, (64 - w) / 2, (64 - h) / 2, w, h);
+        setFavicon(canvas.toDataURL('image/png'), 'image/png');
+      };
+      img.src = settings.hotel_logo;
     } else {
-      link.href = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231e293b'/><text x='16' y='22' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='14' fill='%23c9a84c'>TV</text></svg>";
-      link.type = 'image/svg+xml';
+      setFavicon("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231e293b'/><text x='16' y='22' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='14' fill='%23c9a84c'>TV</text></svg>", 'image/svg+xml');
     }
-    if (!link.parentNode) document.head.appendChild(link);
   }, [settings.hotel_name, settings.hotel_logo]);
 
   useEffect(() => {

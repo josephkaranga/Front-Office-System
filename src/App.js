@@ -6,6 +6,7 @@
  * adminOnly routes: Reports, Channels, Settings.
  */
 import React from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SettingsProvider } from './context/SettingsContext';
@@ -63,6 +64,7 @@ export default function App() {
           <AppRoutes />
         </SettingsProvider>
       </AuthProvider>
+      <Analytics />
     </Router>
   );
 }

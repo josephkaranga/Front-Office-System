@@ -1,23 +1,45 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
+import api from '../utils/api';
 
 export default function Login() {
   const { login } = useAuth();
   const { settings } = useSettings();
+  const [view, setView] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    setError('');
+    setError(''); setSuccess('');
     setLoading(true);
     try { await login(email, password); }
     catch (err) { setError(err.message || 'Invalid credentials.'); }
     finally { setLoading(false); }
   };
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    setError(''); setSuccess('');
+    if (password !== confirmPassword) { setError('Passwords do not match.'); return; }
+    if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    setLoading(true);
+    try {
+      const result = await api.register({ email, password, full_name: fullName });
+      setSuccess(result.message || 'Account created. Please wait for admin approval.');
+      setView('login');
+      setFullName(''); setPassword(''); setConfirmPassword('');
+    } catch (err) { setError(err.message || 'Registration failed.'); }
+    finally { setLoading(false); }
+  };
+
+  const switchView = (v) => { setView(v); setError(''); setSuccess(''); };
 
   return (
     <div className="min-h-screen flex bg-[#f0f2f5]">
@@ -48,7 +70,7 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Right: Login Form */}
+      {/* Right: Forms */}
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-sm">
           <div className="text-center mb-8 lg:hidden">
@@ -56,31 +78,110 @@ export default function Login() {
             <p className="text-xs text-gray-500 uppercase tracking-widest mt-1">{settings.hotel_tagline || 'Front Office'}</p>
           </div>
 
-          <div className="lg:block hidden mb-8">
-            <h2 className="text-xl font-semibold text-gray-900">Welcome back</h2>
-            <p className="text-sm text-gray-500 mt-1">Sign in to start your shift</p>
-          </div>
+          {/* ── Login View ── */}
+          {view === 'login' && (
+            <>
+              <div className="lg:block hidden mb-8">
+                <h2 className="text-xl font-semibold text-gray-900">Welcome back</h2>
+                <p className="text-sm text-gray-500 mt-1">Sign in to start your shift</p>
+              </div>
 
-          {error && (
-            <div className="mb-4 p-2.5 bg-red-50 border border-red-200 rounded text-red-700 text-xs">{error}</div>
+              {error && <div className="mb-4 p-2.5 bg-red-50 border border-red-200 rounded text-red-700 text-xs">{error}</div>}
+              {success && <div className="mb-4 p-2.5 bg-green-50 border border-green-200 rounded text-green-700 text-xs">{success}</div>}
+
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label className="label-field">Email</label>
+                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                    className="input-field" placeholder="Enter email" required autoFocus />
+                </div>
+                <div>
+                  <label className="label-field">Password</label>
+                  <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+                    className="input-field" placeholder="Enter password" required />
+                </div>
+                <button type="submit" disabled={loading}
+                  className="w-full btn-primary py-2.5 disabled:opacity-50 disabled:cursor-not-allowed">
+                  {loading ? 'Signing in...' : 'Sign In'}
+                </button>
+              </form>
+
+              <div className="mt-4 flex items-center justify-between text-xs">
+                <button onClick={() => switchView('forgot')} className="text-blue-600 hover:underline">Forgot password?</button>
+                <button onClick={() => switchView('register')} className="text-blue-600 hover:underline">Create account</button>
+              </div>
+            </>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="label-field">Email</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                className="input-field" placeholder="Enter email" required autoFocus />
-            </div>
-            <div>
-              <label className="label-field">Password</label>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                className="input-field" placeholder="Enter password" required />
-            </div>
-            <button type="submit" disabled={loading}
-              className="w-full btn-primary py-2.5 disabled:opacity-50 disabled:cursor-not-allowed">
-              {loading ? 'Signing in...' : 'Sign In'}
-            </button>
-          </form>
+          {/* ── Register View ── */}
+          {view === 'register' && (
+            <>
+              <div className="mb-6">
+                <h2 className="text-xl font-semibold text-gray-900">Create Account</h2>
+                <p className="text-sm text-gray-500 mt-1">Register as new staff member</p>
+              </div>
+
+              {error && <div className="mb-4 p-2.5 bg-red-50 border border-red-200 rounded text-red-700 text-xs">{error}</div>}
+
+              <form onSubmit={handleRegister} className="space-y-3">
+                <div>
+                  <label className="label-field">Full Name</label>
+                  <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)}
+                    className="input-field" placeholder="Enter full name" required autoFocus />
+                </div>
+                <div>
+                  <label className="label-field">Email</label>
+                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                    className="input-field" placeholder="Enter email" required />
+                </div>
+                <div>
+                  <label className="label-field">Password</label>
+                  <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+                    className="input-field" placeholder="Min. 6 characters" required minLength={6} />
+                </div>
+                <div>
+                  <label className="label-field">Confirm Password</label>
+                  <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="input-field" placeholder="Re-enter password" required minLength={6} />
+                </div>
+                <button type="submit" disabled={loading}
+                  className="w-full btn-primary py-2.5 disabled:opacity-50 disabled:cursor-not-allowed">
+                  {loading ? 'Creating account...' : 'Register'}
+                </button>
+              </form>
+
+              <p className="mt-3 text-xs text-gray-500 text-center">Your account will need admin approval before you can log in.</p>
+              <div className="mt-4 text-center">
+                <button onClick={() => switchView('login')} className="text-xs text-blue-600 hover:underline">Already have an account? Sign in</button>
+              </div>
+            </>
+          )}
+
+          {/* ── Forgot Password View ── */}
+          {view === 'forgot' && (
+            <>
+              <div className="mb-6">
+                <h2 className="text-xl font-semibold text-gray-900">Forgot Password</h2>
+                <p className="text-sm text-gray-500 mt-1">Contact your administrator</p>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                  </svg>
+                  <div>
+                    <p className="text-sm text-blue-900 font-medium">Password Reset</p>
+                    <p className="text-xs text-blue-700 mt-1">Please contact your system administrator to reset your password. The admin can reset it from the Settings page.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 text-center">
+                <button onClick={() => switchView('login')} className="text-xs text-blue-600 hover:underline">Back to Sign In</button>
+              </div>
+            </>
+          )}
 
           <div className="mt-8 pt-6 border-t border-gray-200">
             <p className="text-xs text-gray-400 text-center">East Africa Hotel Management System</p>

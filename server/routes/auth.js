@@ -7,6 +7,22 @@ const { loginLimiter, invalidateUserTokens, clearInvalidation } = require('../mi
 
 const router = express.Router();
 
+router.post('/register', async (req, res) => {
+  try {
+    const { email, password, full_name } = req.body;
+    if (!email || !password || !full_name) return res.status(400).json({ error: 'Full name, email, and password are required.' });
+    if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+    const existing = await db.findOne('users', { email });
+    if (existing) return res.status(409).json({ error: 'An account with this email already exists.' });
+    const salt = bcrypt.genSaltSync(10);
+    const user = await db.insert('users', { email, password: bcrypt.hashSync(password, salt), full_name, role: 'receptionist', is_active: false });
+    res.status(201).json({ message: 'Account created. Please wait for admin approval before logging in.' });
+  } catch (err) {
+    if (err.message?.includes('unique') || err.code === '23505') return res.status(409).json({ error: 'An account with this email already exists.' });
+    console.error('Register error:', err); res.status(500).json({ error: 'Registration failed. Please try again.' });
+  }
+});
+
 router.post('/login', loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -14,7 +30,10 @@ router.post('/login', loginLimiter, async (req, res) => {
 
     const user = await db.findOne('users', { email });
     if (!user) return res.status(401).json({ error: 'Invalid credentials.' });
-    if (!user.is_active && user.is_active !== 1) return res.status(403).json({ error: 'Your account has been suspended. Contact the administrator.' });
+    if (!user.is_active && user.is_active !== 1) {
+      if (!user.last_login) return res.status(403).json({ error: 'Your account is pending approval. Contact the administrator.' });
+      return res.status(403).json({ error: 'Your account has been suspended. Contact the administrator.' });
+    }
     if (!bcrypt.compareSync(password, user.password)) return res.status(401).json({ error: 'Invalid credentials.' });
 
     clearInvalidation(user.id);

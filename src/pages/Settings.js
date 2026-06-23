@@ -20,6 +20,11 @@ export default function Settings() {
   const [newUser, setNewUser] = useState({ email: '', password: '', full_name: '', role: 'receptionist' });
   const [modalError, setModalError] = useState('');
   const [creating, setCreating] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetUser, setResetUser] = useState(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [resetError, setResetError] = useState('');
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     setForm({ ...settings });
@@ -63,6 +68,21 @@ export default function Settings() {
       loadUsers();
       flash(`${user.full_name} has been ${action}d.`);
     } catch (err) { setError(err.message); }
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    setResetError('');
+    if (newPassword.length < 6) { setResetError('Password must be at least 6 characters.'); return; }
+    setResetting(true);
+    try {
+      await api.resetUserPassword(resetUser.id, newPassword);
+      setShowResetModal(false);
+      setNewPassword('');
+      setResetUser(null);
+      flash(`Password reset for ${resetUser.full_name}.`);
+    } catch (err) { setResetError(err.message || 'Failed to reset password.'); }
+    finally { setResetting(false); }
   };
 
   const viewShifts = async (user) => {
@@ -188,9 +208,13 @@ export default function Settings() {
                           </button>
                         </td>
                         <td className="py-2.5 px-4 text-right">
-                          <div className="flex gap-1.5 justify-end">
+                          <div className="flex gap-1.5 justify-end flex-wrap">
                             <button onClick={() => viewShifts(u)} className="px-2 py-1 text-[11px] rounded bg-gray-100 text-gray-600 hover:bg-gray-200">
                               Shifts
+                            </button>
+                            <button onClick={() => { setResetUser(u); setShowResetModal(true); setResetError(''); setNewPassword(''); }}
+                              className="px-2 py-1 text-[11px] rounded bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200">
+                              Reset Password
                             </button>
                             {u.role !== 'admin' && (
                               <button onClick={() => handleToggleStatus(u)}
@@ -430,6 +454,31 @@ export default function Settings() {
                 <p className="text-center py-8 text-gray-400">No shift records found</p>
               )}
             </div>
+          )}
+        </Modal>
+
+        {/* Reset Password Modal */}
+        <Modal isOpen={showResetModal} onClose={() => { setShowResetModal(false); setResetError(''); }} title={`Reset Password — ${resetUser?.full_name}`} size="sm">
+          {resetUser && (
+            <form onSubmit={handleResetPassword} className="space-y-3">
+              {resetError && <div className="p-2.5 bg-red-50 border border-red-200 rounded text-red-700 text-xs">{resetError}</div>}
+              <div className="p-3 bg-gray-50 rounded border border-gray-200">
+                <p className="text-xs text-gray-500">Resetting password for</p>
+                <p className="text-sm font-medium text-gray-900">{resetUser.full_name}</p>
+                <p className="text-xs text-gray-500">{resetUser.email}</p>
+              </div>
+              <div>
+                <label className="label-field">New Password *</label>
+                <input type="password" className="input-field" value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Min. 6 characters" required minLength={6} autoFocus />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button type="button" onClick={() => { setShowResetModal(false); setResetError(''); }} className="btn-secondary">Cancel</button>
+                <button type="submit" disabled={resetting} className="btn-primary disabled:opacity-50">
+                  {resetting ? 'Resetting...' : 'Reset Password'}
+                </button>
+              </div>
+            </form>
           )}
         </Modal>
       </div>

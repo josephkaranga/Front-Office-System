@@ -67,6 +67,7 @@ class ApiClient {
 
   // ── Auth ──
   login(email, password) { return this.post('/auth/login', { email, password }); }
+  register(data) { return this.post('/auth/register', data); }
   logout() { return this.post('/auth/logout', {}); }
   getMe() { return this.get('/auth/me'); }
   getUsers() { return this.get('/auth/users'); }

@@ -69,10 +69,10 @@ export function SettingsProvider({ children }) {
       try { return JSON.parse(cached); } catch (e) {}
     }
     return {
-      hotel_name: 'KYSHAKEZ',
-      hotel_tagline: 'Front Office System',
-      currency: 'KES',
-      country: 'Kenya',
+      hotel_name: 'Terrassa Village',
+      hotel_tagline: 'Hotel & Resort',
+      currency: 'RWF',
+      country: 'Rwanda',
     };
   });
   const [loaded, setLoaded] = useState(false);
@@ -91,6 +91,10 @@ export function SettingsProvider({ children }) {
   };
 
   useEffect(() => { loadSettings(); }, []);
+
+  useEffect(() => {
+    document.title = `${settings.hotel_name || 'Hotel'} — Front Office`;
+  }, [settings.hotel_name]);
 
   useEffect(() => {
     const onLogin = () => loadSettings();

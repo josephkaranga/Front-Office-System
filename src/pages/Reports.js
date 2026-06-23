@@ -2,15 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import { useSettings } from '../context/SettingsContext';
 import api from '../utils/api';
-
-function downloadFile(content, filename, type) {
-  const blob = new Blob([content], { type });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename;
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
-}
+import printPdf from '../utils/printPdf';
 
 export default function Reports() {
   const { formatCurrency, getPaymentLabel, settings } = useSettings();
@@ -35,34 +27,43 @@ export default function Reports() {
     finally { setLoading(false); }
   };
 
+  const fmtD = (s) => { if (!s) return '-'; return new Date(s).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); };
+
   const exportReport = () => {
-    let headers, rows, filename;
+    const period = `${fmtD(fromDate)} — ${fmtD(toDate)}`;
+
     if (activeTab === 'revenue' && revenueData) {
-      headers = ['Period', 'Method', 'Transactions', 'Amount'];
-      rows = (revenueData.data || []).map(d => [d.period, getPaymentLabel(d.payment_method), d.transactions, d.total]);
-      rows.push([]); rows.push(['TOTAL', '', revenueData.grand_total?.count || 0, revenueData.grand_total?.total || 0]);
-      filename = `revenue-report-${fromDate}-to-${toDate}.csv`;
+      printPdf({
+        settings, title: 'Revenue Report', subtitle: period,
+        tableHeaders: [{ label: 'Date' }, { label: 'Payment Method' }, { label: 'Transactions', align: 'right' }, { label: 'Amount', align: 'right' }],
+        tableRows: (revenueData.data || []).map(d => [d.period, getPaymentLabel(d.payment_method), d.transactions, formatCurrency(d.total)]),
+        summaryRows: [
+          ...(revenueData.summary || []).map(s => ({ label: `${getPaymentLabel(s.payment_method)} (${s.count} txns)`, value: formatCurrency(s.total) })),
+          { label: 'GRAND TOTAL', value: formatCurrency(revenueData.grand_total?.total || 0), total: true },
+        ],
+        formatCurrency,
+      });
     } else if (activeTab === 'occupancy' && occupancyData) {
-      headers = ['Room Type', 'Total', 'Occupied', 'Available'];
-      rows = (occupancyData.by_type || []).map(t => [t.room_type, t.total, t.occupied, t.available]);
-      filename = `occupancy-report-${fromDate}-to-${toDate}.csv`;
+      printPdf({
+        settings, title: 'Occupancy Report', subtitle: period,
+        tableHeaders: [{ label: 'Room Type' }, { label: 'Total', align: 'right' }, { label: 'Occupied', align: 'right' }, { label: 'Available', align: 'right' }, { label: 'Occupancy', align: 'right' }],
+        tableRows: (occupancyData.by_type || []).map(t => [t.room_type, t.total, t.occupied, t.available, t.total > 0 ? `${Math.round((t.occupied / t.total) * 100)}%` : '0%']),
+        summaryRows: [],
+        formatCurrency,
+      });
     } else if (activeTab === 'history' && historyData.length > 0) {
-      headers = ['Guest', 'Phone', 'Room', 'Type', 'Check-in', 'Check-out', 'Nationality', 'Rate', 'Status', 'Staff'];
-      rows = historyData.map(h => [`${h.first_name} ${h.last_name}`, h.phone || '', h.room_number, h.room_type, h.checkin_date, h.checkout_date || '', h.nationality || '', h.rate_per_night, h.status, h.checked_in_by_name || '']);
-      filename = `guest-history-${historyType}-${fromDate}-to-${toDate}.csv`;
-    } else return;
-    const brandLines = [
-      [settings.hotel_name || 'Hotel'],
-      [settings.hotel_tagline || ''],
-      [settings.hotel_address || ''],
-      [[settings.hotel_phone, settings.hotel_email].filter(Boolean).join(' | ')],
-      [settings.hotel_tin ? `TIN: ${settings.hotel_tin}` : ''],
-      [],
-      [`Report: ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} | Period: ${fromDate} to ${toDate}`],
-      [],
-    ].filter(l => l.length === 0 || l[0] !== '');
-    const csv = [...brandLines, headers, ...rows].map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
-    downloadFile(csv, filename, 'text/csv');
+      printPdf({
+        settings, title: 'Guest History Report', subtitle: `${period} | Type: ${historyType}`,
+        tableHeaders: [{ label: 'Guest' }, { label: 'Room' }, { label: 'Check-in' }, { label: 'Check-out' }, { label: 'Rate', align: 'right' }, { label: 'Status' }, { label: 'Staff' }],
+        tableRows: historyData.map(h => [
+          `${h.first_name} ${h.last_name}`, `${h.room_number} - ${h.room_type}`,
+          fmtD(h.checkin_date), h.checkout_date ? fmtD(h.checkout_date) : '-',
+          formatCurrency(h.rate_per_night), h.status.replace('_', ' '), h.checked_in_by_name || '-',
+        ]),
+        summaryRows: [{ label: 'Total Records', value: `${historyData.length}`, total: true }],
+        formatCurrency,
+      });
+    }
   };
 
   return (
@@ -89,8 +90,8 @@ export default function Reports() {
               </select>
             )}
             <button onClick={exportReport} className="btn-secondary text-[11px] py-1 px-2 flex items-center gap-1">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-              Export
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+              Export PDF
             </button>
             {[7, 30, 90].map(d => (
               <button key={d} onClick={() => { const dt = new Date(); dt.setDate(dt.getDate() - d); setFromDate(dt.toISOString().split('T')[0]); setToDate(new Date().toISOString().split('T')[0]); }}

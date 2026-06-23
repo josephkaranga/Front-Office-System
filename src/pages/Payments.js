@@ -4,6 +4,7 @@ import Modal from '../components/Modal';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
+import printPdf from '../utils/printPdf';
 
 export default function Payments() {
   const { formatCurrency, settings, getPaymentMethods, getPaymentLabel } = useSettings();
@@ -56,22 +57,42 @@ export default function Payments() {
     } catch (err) { setError(err.message); }
   };
 
-  const exportCSV = () => {
+  const exportPdf = () => {
     if (payments.length === 0) return;
-    const headers = ['Transaction ID', 'Date', 'Guest', 'Room', 'Method', 'Reference', 'Description', 'Amount', 'Received By'];
-    const rows = payments.map(p => [
-      p.transaction_id || '-',
-      p.payment_date,
-      `${p.first_name} ${p.last_name}`,
-      p.room_number || '-',
-      getPaymentLabel(p.payment_method),
-      p.reference_number || '-',
-      p.description || '-',
-      p.amount,
-      p.received_by_name || '-',
-    ]);
-    const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-    downloadFile(csv, `payments-${dateFilter || 'all'}.csv`, 'text/csv');
+    const total = payments.reduce((s, p) => s + p.amount, 0);
+    printPdf({
+      settings,
+      title: 'Payment Report',
+      subtitle: `Date: ${dateFilter || 'All'}${methodFilter ? ' | Method: ' + getPaymentLabel(methodFilter) : ''} | ${payments.length} transactions`,
+      tableHeaders: [
+        { label: 'Date' }, { label: 'Guest' }, { label: 'Room' },
+        { label: 'Method' }, { label: 'Reference' },
+        { label: 'Amount', align: 'right' }, { label: 'Received By' },
+      ],
+      tableRows: payments.map(p => [
+        fmtDT(p.payment_date),
+        `${p.first_name} ${p.last_name}`,
+        p.room_number || '-',
+        getPaymentLabel(p.payment_method),
+        p.reference_number || '-',
+        formatCurrency(p.amount),
+        p.received_by_name || '-',
+      ]),
+      summaryRows: [
+        ...Object.entries(methodSummary).map(([key, val]) => ({
+          label: `${getPaymentLabel(key)} (${val.count} txns)`,
+          value: formatCurrency(val.total),
+        })),
+        { label: 'TOTAL', value: formatCurrency(total), total: true },
+      ],
+      formatCurrency,
+    });
+  };
+
+  const fmtDT = (s) => {
+    if (!s) return '-';
+    const d = new Date(s);
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   };
 
   const paymentMethods = getPaymentMethods();
@@ -116,9 +137,9 @@ export default function Payments() {
             </select>
           </div>
           <div className="flex gap-2">
-            <button onClick={exportCSV} className="btn-secondary text-xs flex items-center gap-1">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-              Export CSV
+            <button onClick={exportPdf} className="btn-secondary text-xs flex items-center gap-1">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+              Export PDF
             </button>
             <button onClick={() => setShowModal(true)} className="btn-primary text-xs">+ Record Payment</button>
           </div>

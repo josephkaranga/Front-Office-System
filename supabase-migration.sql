@@ -26,7 +26,7 @@ CREATE TABLE users (
 
 CREATE TABLE shifts (
   id SERIAL PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES users(id),
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   login_time TIMESTAMPTZ DEFAULT now(),
   logout_time TIMESTAMPTZ
 );

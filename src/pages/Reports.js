@@ -13,7 +13,7 @@ function downloadFile(content, filename, type) {
 }
 
 export default function Reports() {
-  const { formatCurrency, getPaymentLabel } = useSettings();
+  const { formatCurrency, getPaymentLabel, settings } = useSettings();
   const [activeTab, setActiveTab] = useState('revenue');
   const [revenueData, setRevenueData] = useState(null);
   const [occupancyData, setOccupancyData] = useState(null);
@@ -51,7 +51,17 @@ export default function Reports() {
       rows = historyData.map(h => [`${h.first_name} ${h.last_name}`, h.phone || '', h.room_number, h.room_type, h.checkin_date, h.checkout_date || '', h.nationality || '', h.rate_per_night, h.status, h.checked_in_by_name || '']);
       filename = `guest-history-${historyType}-${fromDate}-to-${toDate}.csv`;
     } else return;
-    const csv = [headers, ...rows].map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const brandLines = [
+      [settings.hotel_name || 'Hotel'],
+      [settings.hotel_tagline || ''],
+      [settings.hotel_address || ''],
+      [[settings.hotel_phone, settings.hotel_email].filter(Boolean).join(' | ')],
+      [settings.hotel_tin ? `TIN: ${settings.hotel_tin}` : ''],
+      [],
+      [`Report: ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} | Period: ${fromDate} to ${toDate}`],
+      [],
+    ].filter(l => l.length === 0 || l[0] !== '');
+    const csv = [...brandLines, headers, ...rows].map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
     downloadFile(csv, filename, 'text/csv');
   };
 

@@ -12,6 +12,17 @@ export default function Receipt({ data, formatCurrency, onClose }) {
   const email = data.hotel?.hotel_email || '';
   const tin = data.hotel?.hotel_tin || '';
 
+  const nightRate = data.charged_rate || data.room?.rate_per_night;
+  const nights = data.nights || 1;
+
+  const roomCharges = [];
+  const checkinDate = new Date(data.checkin?.checkin_date);
+  for (let i = 0; i < nights; i++) {
+    const d = new Date(checkinDate);
+    d.setDate(d.getDate() + i);
+    roomCharges.push({ day: i + 1, date: d, amount: nightRate });
+  }
+
   const buildReceiptHTML = () => `<!DOCTYPE html><html><head><title>Receipt ${data.receipt_number}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -46,27 +57,21 @@ ${tin ? `<div class="sm">TIN: ${tin}</div>` : ''}
 <div class="row"><span>Room:</span><span>${data.room?.room_number} - ${data.room?.room_type}</span></div>
 <div class="row"><span>Check-in:</span><span>${fmtD(data.checkin?.checkin_date)}</span></div>
 <div class="row"><span>Check-out:</span><span>${data.checkin?.checkout_date ? fmtD(data.checkin.checkout_date) : 'In-House'}</span></div>
-<div class="row"><span>Nights:</span><span>${data.nights}</span></div>
+<div class="row"><span>Nights:</span><span>${nights}</span></div>
 <div class="sep2"></div>
-<div class="b">ACCOMMODATION</div>
-<div class="row indent"><span>Rate/night (${data.checkin?.num_guests >= 2 ? '2 pax' : '1 pax'} BB)</span><span>${fmtC(data.original_rate || data.room?.rate_per_night)}</span></div>
-${data.has_discount ? `<div class="row indent" style="color:#16a34a"><span>Discount/night${data.discount_reason ? ' (' + data.discount_reason + ')' : ''}</span><span>-${fmtC(data.discount_per_night)}</span></div>
-<div class="row indent"><span>Charged rate/night</span><span>${fmtC(data.charged_rate)}</span></div>` : ''}
-<div class="row indent"><span>${data.nights} night(s) @ ${fmtC(data.charged_rate || data.room?.rate_per_night)}</span><span>${fmtC(data.room_total)}</span></div>
-${data.has_discount ? `<div class="row indent sm"><span>Total discount (${data.nights}n)</span><span>-${fmtC(data.total_discount)}</span></div>` : ''}
-${data.extras?.length > 0 ? `
+<div class="b">CHARGES</div>
+${roomCharges.map(r => `<div class="row indent"><span>Room (Day ${r.day})</span><span>${fmtC(r.amount)}</span></div>`).join('')}
+${data.has_discount ? `<div class="row indent" style="color:#16a34a"><span>Discount${data.discount_reason ? ' (' + data.discount_reason + ')' : ''}</span><span>-${fmtC(data.total_discount)}</span></div>` : ''}
+${data.extras?.length > 0 ? data.extras.map(e => `<div class="row indent"><span>${e.item_name} x${e.quantity}</span><span>${fmtC(e.total_price)}</span></div>`).join('') : ''}
 <div class="sep"></div>
-<div class="b">EXTRAS</div>
-${data.extras.map(e => `<div class="row indent"><span>${e.item_name} x${e.quantity}</span><span>${fmtC(e.total_price)}</span></div>`).join('')}
-<div class="sep"></div>
-<div class="row"><span>Extras Total:</span><span>${fmtC(data.extras_total)}</span></div>` : ''}
+<div class="row b"><span>Total Charges</span><span>${fmtC(data.grand_total)}</span></div>
 <div class="sep2"></div>
-<div class="row b" style="font-size:14px"><span>TOTAL:</span><span>${fmtC(data.grand_total)}</span></div>
-<div class="sep"></div>
 <div class="b">PAYMENTS</div>
-${data.payments?.length > 0 ? data.payments.map(p => `<div class="row indent"><span>${p.payment_method}${p.transaction_id ? ' #' + p.transaction_id.split('-').pop() : ''}</span><span>${fmtC(p.amount)}</span></div>`).join('') : '<div class="indent sm">No payments</div>'}
-<div class="row"><span>Total Paid:</span><span class="b">${fmtC(data.paid_total)}</span></div>
-${data.balance > 0 ? `<div class="row b" style="font-size:13px"><span>BALANCE DUE:</span><span>${fmtC(data.balance)}</span></div>` : '<div class="row b"><span>STATUS:</span><span>PAID IN FULL</span></div>'}
+${data.payments?.length > 0 ? data.payments.map(p => `<div class="row indent"><span>${fmtD(p.payment_date)} - ${p.payment_method}</span><span>${fmtC(p.amount)}</span></div>`).join('') : '<div class="indent sm">No payments</div>'}
+<div class="sep"></div>
+<div class="row b"><span>Total Paid</span><span>${fmtC(data.paid_total)}</span></div>
+<div class="sep2"></div>
+${data.balance > 0 ? `<div class="row b" style="font-size:14px"><span>BALANCE DUE:</span><span>${fmtC(data.balance)}</span></div>` : '<div class="row b" style="font-size:13px"><span>STATUS:</span><span>PAID IN FULL</span></div>'}
 <div class="sep2"></div>
 <div class="sm c" style="margin-top:6px">
 <div>Served by: ${data.served_by || '-'}</div>
@@ -89,8 +94,7 @@ ${data.checked_out_by ? `<div>Check-out: ${data.checked_out_by}</div>` : ''}
 
   return (
     <div className="space-y-4">
-      {/* Live Preview */}
-      <div className="bg-white border border-gray-300 rounded p-4 font-mono text-[11px] max-h-[450px] overflow-y-auto shadow-inner mx-auto" style={{ maxWidth: 320 }}>
+      <div className="bg-white border border-gray-300 rounded p-4 font-mono text-[11px] max-h-[500px] overflow-y-auto shadow-inner mx-auto" style={{ maxWidth: 340 }}>
         {logo && <div className="text-center mb-2"><img src={logo} alt="logo" className="mx-auto" style={{ maxWidth: 100, maxHeight: 50 }} /></div>}
         <div className="text-center mb-1">
           <p className="text-sm font-bold tracking-wide">{hotelName}</p>
@@ -109,36 +113,43 @@ ${data.checked_out_by ? `<div>Check-out: ${data.checked_out_by}</div>` : ''}
         <Row l="Room:" r={`${data.room?.room_number} - ${data.room?.room_type}`} />
         <Row l="Check-in:" r={fmtD(data.checkin?.checkin_date)} />
         <Row l="Check-out:" r={data.checkin?.checkout_date ? fmtD(data.checkin.checkout_date) : 'In-House'} />
-        <Row l="Nights:" r={data.nights} />
+        <Row l="Nights:" r={nights} />
         <hr className="border-gray-900 border-double my-1.5" />
-        <p className="font-bold">ACCOMMODATION</p>
-        <Row l={`Rate/night (${data.checkin?.num_guests >= 2 ? '2 pax' : '1 pax'} BB)`} r={fmtC(data.original_rate || data.room?.rate_per_night)} indent />
+
+        {/* Charges Section */}
+        <p className="font-bold">CHARGES</p>
+        {roomCharges.map(r => (
+          <Row key={r.day} l={`Room (Day ${r.day})`} r={fmtC(r.amount)} indent />
+        ))}
         {data.has_discount && (
-          <>
-            <div className="flex justify-between pl-3 text-green-700"><span>Discount{data.discount_reason ? ` (${data.discount_reason})` : ''}</span><span>-{fmtC(data.discount_per_night)}/n</span></div>
-            <Row l="Charged rate" r={`${fmtC(data.charged_rate)}/n`} indent bold />
-          </>
+          <div className="flex justify-between pl-3 text-green-700">
+            <span>Discount{data.discount_reason ? ` (${data.discount_reason})` : ''}</span>
+            <span>-{fmtC(data.total_discount)}</span>
+          </div>
         )}
-        <Row l={`${data.nights}n × ${fmtC(data.charged_rate || data.room?.rate_per_night)}`} r={fmtC(data.room_total)} indent />
-        {data.has_discount && <div className="flex justify-between pl-3 text-[10px] text-gray-500"><span>Total saved</span><span>-{fmtC(data.total_discount)}</span></div>}
-        {data.extras?.length > 0 && (
-          <>
-            <hr className="border-dashed border-gray-400 my-1" />
-            <p className="font-bold">EXTRAS</p>
-            {data.extras.map((e, i) => <Row key={i} l={`${e.item_name} x${e.quantity}`} r={fmtC(e.total_price)} indent />)}
-            <hr className="border-dashed border-gray-400 my-1" />
-            <Row l="Extras:" r={fmtC(data.extras_total)} />
-          </>
-        )}
-        <hr className="border-gray-900 border-double my-1.5" />
-        <div className="flex justify-between font-bold text-xs"><span>TOTAL:</span><span>{fmtC(data.grand_total)}</span></div>
+        {data.extras?.length > 0 && data.extras.map((e, i) => (
+          <Row key={i} l={`${e.item_name} x${e.quantity}`} r={fmtC(e.total_price)} indent />
+        ))}
         <hr className="border-dashed border-gray-400 my-1" />
+        <Row l="Total Charges" r={fmtC(data.grand_total)} bold />
+
+        <hr className="border-gray-900 border-double my-1.5" />
+
+        {/* Payments Section */}
         <p className="font-bold">PAYMENTS</p>
-        {data.payments?.map((p, i) => <Row key={i} l={p.payment_method} r={fmtC(p.amount)} indent />)}
-        <Row l="Paid:" r={fmtC(data.paid_total)} bold />
+        {data.payments?.length > 0 ? data.payments.map((p, i) => (
+          <Row key={i} l={`${fmtD(p.payment_date)} - ${p.payment_method}`} r={fmtC(p.amount)} indent />
+        )) : <p className="pl-3 text-gray-400">No payments</p>}
+        <hr className="border-dashed border-gray-400 my-1" />
+        <Row l="Total Paid" r={fmtC(data.paid_total)} bold />
+
+        <hr className="border-gray-900 border-double my-1.5" />
+
+        {/* Balance */}
         {data.balance > 0
-          ? <div className="flex justify-between font-bold text-red-700"><span>BALANCE:</span><span>{fmtC(data.balance)}</span></div>
-          : <div className="flex justify-between font-bold text-green-700"><span>STATUS:</span><span>PAID IN FULL</span></div>}
+          ? <div className="flex justify-between font-bold text-red-700 text-xs"><span>BALANCE DUE:</span><span>{fmtC(data.balance)}</span></div>
+          : <div className="flex justify-between font-bold text-green-700 text-xs"><span>STATUS:</span><span>PAID IN FULL</span></div>}
+
         <hr className="border-gray-900 border-double my-1.5" />
         <div className="text-center text-gray-500 mt-1.5 space-y-0.5">
           <p>Served by: <span className="text-gray-800 font-medium">{data.served_by}</span></p>

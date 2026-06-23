@@ -133,6 +133,21 @@ router.get('/users/:id/shifts', authenticateToken, requireAdmin, async (req, res
   } catch (err) { console.error(err); res.status(500).json({ error: 'Failed.' }); }
 });
 
+router.put('/users/:id/role', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const userId = Number(req.params.id);
+    const { role } = req.body;
+    if (!['admin', 'receptionist'].includes(role)) return res.status(400).json({ error: 'Invalid role.' });
+    if (userId === req.user.id) return res.status(400).json({ error: 'You cannot change your own role.' });
+    const user = await db.findOne('users', { id: userId });
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    await db.update('users', { id: userId }, { role });
+    const updated = await db.findOne('users', { id: userId });
+    const { password, ...safe } = updated;
+    res.json(safe);
+  } catch (err) { res.status(500).json({ error: 'Failed to change role.' }); }
+});
+
 router.put('/users/:id/status', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const userId = Number(req.params.id);

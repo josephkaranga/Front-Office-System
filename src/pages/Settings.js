@@ -85,6 +85,16 @@ export default function Settings() {
     finally { setResetting(false); }
   };
 
+  const handleChangeRole = async (user) => {
+    const newRole = user.role === 'admin' ? 'receptionist' : 'admin';
+    if (!confirm(`Change ${user.full_name}'s role to ${newRole}?`)) return;
+    try {
+      await api.setUserRole(user.id, newRole);
+      loadUsers();
+      flash(`${user.full_name} is now ${newRole}.`);
+    } catch (err) { setError(err.message); }
+  };
+
   const viewShifts = async (user) => {
     setSelectedUser(user);
     try {
@@ -215,6 +225,10 @@ export default function Settings() {
                             <button onClick={() => { setResetUser(u); setShowResetModal(true); setResetError(''); setNewPassword(''); }}
                               className="px-2 py-1 text-[11px] rounded bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200">
                               Reset Password
+                            </button>
+                            <button onClick={() => handleChangeRole(u)}
+                              className="px-2 py-1 text-[11px] rounded bg-purple-50 text-purple-600 hover:bg-purple-100 border border-purple-200">
+                              {u.role === 'admin' ? 'Make Receptionist' : 'Make Admin'}
                             </button>
                             {u.role !== 'admin' && (
                               <button onClick={() => handleToggleStatus(u)}

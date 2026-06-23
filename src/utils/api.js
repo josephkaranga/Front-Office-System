@@ -73,6 +73,7 @@ class ApiClient {
   getUsers() { return this.get('/auth/users'); }
   createUser(data) { return this.post('/auth/users', data); }
   setUserStatus(id, is_active) { return this.put(`/auth/users/${id}/status`, { is_active }); }
+  setUserRole(id, role) { return this.put(`/auth/users/${id}/role`, { role }); }
   getUserShifts(id, limit = 30) { return this.get(`/auth/users/${id}/shifts?limit=${limit}`); }
   getShifts(params = {}) { const qs = new URLSearchParams(params).toString(); return this.get(`/auth/shifts${qs ? `?${qs}` : ''}`); }
   changePassword(current_password, new_password) { return this.put('/auth/change-password', { current_password, new_password }); }

@@ -33,9 +33,16 @@ router.get('/', authenticateToken, async (req, res) => {
 
 router.post('/', authenticateToken, async (req, res) => {
   try {
-    const { guest_id, room_id, expected_checkout, num_guests, stay_type, car_registration, purpose, special_requests, original_rate, charged_rate, discount_per_night, discount_reason } = req.body;
+    const {
+      guest_id, room_id, expected_checkout, num_guests, stay_type,
+      car_registration, purpose, special_requests,
+      original_rate, charged_rate, discount_per_night, discount_reason,
+      payment_type, payment_amount, payment_method, payment_reference,
+    } = req.body;
+
     if (!guest_id || !room_id || !expected_checkout) return res.status(400).json({ error: 'Guest, room, and expected checkout date are required.' });
 
+    // ── 1. Validate room availability ──
     const room = await db.findOne('rooms', { id: Number(room_id) });
     if (!room) return res.status(404).json({ error: 'Room not found.' });
     if (room.status !== 'available' && room.status !== 'reserved') return res.status(400).json({ error: `Room ${room.room_number} is currently ${room.status}.` });
@@ -43,7 +50,8 @@ router.post('/', authenticateToken, async (req, res) => {
     const pax = Number(num_guests) || 1;
     const rackRate = (pax >= 2 && room.rate_double) ? Number(room.rate_double) : Number(room.rate_per_night);
 
-    const checkin = await db.insert('checkins', {
+    // ── 2. Create stay record (physical presence) ──
+    const stay = await db.insert('checkins', {
       guest_id: Number(guest_id), room_id: Number(room_id), checkin_date: new Date().toISOString(),
       expected_checkout, num_guests: pax, stay_type: stay_type || 'night',
       car_registration: car_registration || null, purpose: purpose || null,
@@ -54,10 +62,30 @@ router.post('/', authenticateToken, async (req, res) => {
       discount_reason: discount_reason || null,
     });
 
+    // ── 3. Update room status ──
     await db.update('rooms', { id: Number(room_id) }, { status: 'occupied' });
 
+    // ── 4. Record initial payment if provided ──
+    let payment = null;
+    if (payment_type && payment_type !== 'not_paid' && Number(payment_amount) > 0) {
+      payment = await db.insert('payments', {
+        checkin_id: stay.id,
+        guest_id: Number(guest_id),
+        amount: Number(payment_amount),
+        payment_method: payment_method || 'cash',
+        reference_number: payment_reference || null,
+        description: `Check-in Room ${room.room_number}`,
+        received_by: req.user.id,
+      });
+    }
+
     const guest = await db.findOne('guests', { id: Number(guest_id) });
-    res.status(201).json({ ...checkin, first_name: guest?.first_name, last_name: guest?.last_name, phone: guest?.phone, room_number: room.room_number, room_type: room.room_type });
+    res.status(201).json({
+      ...stay,
+      first_name: guest?.first_name, last_name: guest?.last_name, phone: guest?.phone,
+      room_number: room.room_number, room_type: room.room_type,
+      payment: payment ? { id: payment.id, amount: payment.amount, method: payment.payment_method } : null,
+    });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Check-in failed.' }); }
 });
 

@@ -62,22 +62,17 @@ export default function CheckIn() {
       setError('Enter a payment amount or select "No Payment".'); return;
     }
     try {
-      const checkin = await api.checkIn({
+      const result = await api.checkIn({
         guest_id: selectedGuest.id, room_id: selectedRoom.id, ...checkinForm,
         original_rate: activeRate,
         charged_rate: effectiveRate,
         discount_per_night: discountPerNight,
         discount_reason: discount.reason || null,
+        payment_type: paymentType,
+        payment_amount: paymentType !== 'not_paid' ? Number(paymentForm.amount) : 0,
+        payment_method: paymentForm.payment_method,
+        payment_reference: paymentForm.reference_number || null,
       });
-
-      if (paymentType !== 'not_paid' && Number(paymentForm.amount) > 0) {
-        await api.createPayment({
-          checkin_id: checkin.id, guest_id: selectedGuest.id,
-          amount: Number(paymentForm.amount), payment_method: paymentForm.payment_method,
-          reference_number: paymentForm.reference_number || null,
-          description: `Room ${selectedRoom.room_number} (${nights}n × ${formatCurrency(effectiveRate)})`,
-        });
-      }
 
       const payMsg = paymentType === 'not_paid' ? 'No payment' : `Paid: ${formatCurrency(paymentForm.amount)}`;
       setSuccess(`${selectedGuest.first_name} ${selectedGuest.last_name} checked into Room ${selectedRoom.room_number}. ${payMsg}`);

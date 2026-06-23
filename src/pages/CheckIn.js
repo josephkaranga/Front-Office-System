@@ -21,6 +21,7 @@ export default function CheckIn() {
     car_registration: '', purpose: '', special_requests: '',
   });
   const [discount, setDiscount] = useState({ type: 'amount', value: '', reason: '' });
+  const [paymentType, setPaymentType] = useState('not_paid');
   const [paymentForm, setPaymentForm] = useState({
     amount: '', payment_method: 'cash', reference_number: '',
   });
@@ -47,13 +48,17 @@ export default function CheckIn() {
     setError('');
     if (!selectedGuest || !selectedRoom) { setError('Select a guest and room.'); return; }
     if (!checkinForm.expected_checkout) { setError('Set expected checkout date.'); return; }
-    setPaymentForm(p => ({ ...p, amount: finalTotal }));
+    setPaymentType('not_paid');
+    setPaymentForm(p => ({ ...p, amount: '' }));
     setStep(2);
   };
 
   const handleCheckIn = async (e) => {
     e.preventDefault();
     setError('');
+    if (paymentType !== 'not_paid' && (!paymentForm.amount || Number(paymentForm.amount) <= 0)) {
+      setError('Enter a payment amount or select "No Payment".'); return;
+    }
     try {
       const checkin = await api.checkIn({
         guest_id: selectedGuest.id, room_id: selectedRoom.id, ...checkinForm,
@@ -63,7 +68,7 @@ export default function CheckIn() {
         discount_reason: discount.reason || null,
       });
 
-      if (Number(paymentForm.amount) > 0) {
+      if (paymentType !== 'not_paid' && Number(paymentForm.amount) > 0) {
         await api.createPayment({
           checkin_id: checkin.id, guest_id: selectedGuest.id,
           amount: Number(paymentForm.amount), payment_method: paymentForm.payment_method,
@@ -72,10 +77,12 @@ export default function CheckIn() {
         });
       }
 
-      setSuccess(`${selectedGuest.first_name} ${selectedGuest.last_name} checked into Room ${selectedRoom.room_number}. Payment: ${formatCurrency(paymentForm.amount)}`);
+      const payMsg = paymentType === 'not_paid' ? 'No payment' : `Paid: ${formatCurrency(paymentForm.amount)}`;
+      setSuccess(`${selectedGuest.first_name} ${selectedGuest.last_name} checked into Room ${selectedRoom.room_number}. ${payMsg}`);
       setShowModal(false); setSelectedGuest(null); setSelectedRoom(null); setStep(1);
       setCheckinForm({ expected_checkout: '', num_guests: 1, stay_type: 'night', car_registration: '', purpose: '', special_requests: '' });
       setPaymentForm({ amount: '', payment_method: 'cash', reference_number: '' });
+      setPaymentType('not_paid');
       setDiscount({ type: 'amount', value: '', reason: '' });
       loadRooms();
       setTimeout(() => setSuccess(''), 6000);
@@ -286,52 +293,74 @@ export default function CheckIn() {
           {/* ── Step 2: Payment ── */}
           {step === 2 && (
             <form onSubmit={handleCheckIn} className="space-y-4">
-              {/* Summary */}
               <div className="bg-gray-50 rounded border border-gray-200 p-4 space-y-2 text-sm">
                 <div className="flex justify-between"><span className="text-gray-500">Guest</span><span className="font-medium text-gray-900">{selectedGuest?.first_name} {selectedGuest?.last_name}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Room</span><span className="text-gray-900">{selectedRoom?.room_number} — {selectedRoom?.room_type}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Pax</span><span className="text-gray-900">{Number(checkinForm.num_guests) >= 2 ? '2 pax' : '1 pax'} BB</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Rack Rate</span><span className="text-gray-900">{formatCurrency(activeRate)}/night</span></div>
-                {discountPerNight > 0 && (
-                  <div className="flex justify-between text-green-700"><span>Discount/night{discount.reason ? ` (${discount.reason})` : ''}</span><span>-{formatCurrency(discountPerNight)}</span></div>
-                )}
-                {discountPerNight > 0 && (
-                  <div className="flex justify-between"><span className="text-gray-500">Effective Rate</span><span className="font-medium text-gray-900">{formatCurrency(effectiveRate)}/night</span></div>
-                )}
-                <div className="flex justify-between"><span className="text-gray-500">Duration</span><span className="text-gray-900">{nights} night(s)</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span className="text-gray-900">{formatCurrency(nights * activeRate)}</span></div>
-                {discountAmount > 0 && (
-                  <div className="flex justify-between text-green-700"><span>Total Discount ({nights}n × {formatCurrency(discountPerNight)})</span><span>-{formatCurrency(discountAmount)}</span></div>
-                )}
-                <div className="flex justify-between pt-2 border-t border-gray-200"><span className="font-semibold text-gray-700">Total Due</span><span className="text-lg font-bold text-gray-900">{formatCurrency(finalTotal)}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Room</span><span>{selectedRoom?.room_number} — {selectedRoom?.room_type}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Rate</span><span>{formatCurrency(effectiveRate)}/night{discountPerNight > 0 ? ` (${formatCurrency(discountPerNight)} off)` : ''}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Duration</span><span>{nights} night(s)</span></div>
+                <div className="flex justify-between pt-2 border-t border-gray-200 font-bold"><span>Total Due</span><span className="text-lg">{formatCurrency(finalTotal)}</span></div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="label-field">Amount Paid ({settings.currency})</label>
-                  <input type="number" className="input-field" value={paymentForm.amount} onChange={(e) => setPaymentForm(p => ({ ...p, amount: e.target.value }))} required />
-                </div>
-                <div>
-                  <label className="label-field">Payment Method</label>
-                  <select className="select-field" value={paymentForm.payment_method} onChange={(e) => setPaymentForm(p => ({ ...p, payment_method: e.target.value }))}>
-                    {getPaymentMethods().map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                  </select>
-                </div>
-                <div className="col-span-2">
-                  <label className="label-field">Reference / Receipt No.</label>
-                  <input type="text" className="input-field" placeholder="Transaction reference (optional)" value={paymentForm.reference_number} onChange={(e) => setPaymentForm(p => ({ ...p, reference_number: e.target.value }))} />
+              <div>
+                <label className="label-field">Initial Payment</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: 'paid_full', label: 'Paid in Full', desc: formatCurrency(finalTotal), color: 'green' },
+                    { value: 'paid_partial', label: 'Partial Payment', desc: 'Enter amount', color: 'amber' },
+                    { value: 'not_paid', label: 'No Payment', desc: 'Pay later', color: 'gray' },
+                  ].map(opt => (
+                    <button key={opt.value} type="button" onClick={() => {
+                      setPaymentType(opt.value);
+                      if (opt.value === 'paid_full') setPaymentForm(p => ({ ...p, amount: finalTotal }));
+                      else if (opt.value === 'not_paid') setPaymentForm(p => ({ ...p, amount: '' }));
+                      else setPaymentForm(p => ({ ...p, amount: '' }));
+                    }}
+                      className={`p-3 rounded border-2 text-left transition-all ${paymentType === opt.value
+                        ? `border-${opt.color}-500 bg-${opt.color}-50`
+                        : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                      <p className={`text-sm font-semibold ${paymentType === opt.value ? `text-${opt.color}-700` : 'text-gray-700'}`}>{opt.label}</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">{opt.desc}</p>
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {Number(paymentForm.amount) < nights * (selectedRoom?.rate_per_night || 0) && Number(paymentForm.amount) > 0 && (
+              {paymentType !== 'not_paid' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="label-field">Amount ({settings.currency})</label>
+                    <input type="number" min="1" className="input-field" value={paymentForm.amount}
+                      onChange={(e) => setPaymentForm(p => ({ ...p, amount: e.target.value }))}
+                      readOnly={paymentType === 'paid_full'} required />
+                  </div>
+                  <div>
+                    <label className="label-field">Payment Method</label>
+                    <select className="select-field" value={paymentForm.payment_method} onChange={(e) => setPaymentForm(p => ({ ...p, payment_method: e.target.value }))}>
+                      {getPaymentMethods().map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="label-field">Reference No.</label>
+                    <input type="text" className="input-field" placeholder="Transaction reference (optional)" value={paymentForm.reference_number} onChange={(e) => setPaymentForm(p => ({ ...p, reference_number: e.target.value }))} />
+                  </div>
+                </div>
+              )}
+
+              {paymentType === 'paid_partial' && Number(paymentForm.amount) > 0 && (
                 <div className="p-2.5 bg-amber-50 border border-amber-200 rounded text-amber-700 text-xs">
-                  Partial payment: {formatCurrency(paymentForm.amount)} of {formatCurrency(nights * selectedRoom.rate_per_night)}. Balance: {formatCurrency((nights * selectedRoom.rate_per_night) - paymentForm.amount)}
+                  Paying {formatCurrency(paymentForm.amount)} of {formatCurrency(finalTotal)}. Balance: {formatCurrency(finalTotal - Number(paymentForm.amount))}
+                </div>
+              )}
+
+              {paymentType === 'not_paid' && (
+                <div className="p-2.5 bg-gray-50 border border-gray-200 rounded text-gray-600 text-xs">
+                  Guest will check in without payment. Payment can be collected later from the folio.
                 </div>
               )}
 
               <div className="flex gap-2 justify-between">
                 <button type="button" onClick={() => setStep(1)} className="btn-secondary">Back</button>
-                <button type="submit" className="btn-success">Confirm Check-In & Payment</button>
+                <button type="submit" className="btn-success">Confirm Check-In</button>
               </div>
             </form>
           )}

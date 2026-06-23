@@ -27,6 +27,7 @@ export default function GuestFolio() {
   const [folioLoading, setFolioLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptData, setReceiptData] = useState(null);
   const [success, setSuccess] = useState('');
@@ -66,24 +67,32 @@ export default function GuestFolio() {
     try { await api.deleteExtra(id); loadFolio(selectedCheckin.id); } catch (err) { console.error(err); }
   };
 
-  const openCheckout = () => {
+  const openPayment = () => {
     if (!folio) return;
-    const bal = folio.balance || 0;
-    setPayForm({ amount: bal > 0 ? bal : '', payment_method: 'cash', reference_number: '' });
-    setShowCheckoutModal(true);
+    setPayForm({ amount: folio.balance > 0 ? folio.balance : '', payment_method: 'cash', reference_number: '' });
+    setError('');
+    setShowPaymentModal(true);
   };
 
-  const processCheckout = async (e) => {
+  const recordPayment = async (e) => {
     e.preventDefault(); setError('');
+    if (Number(payForm.amount) <= 0) { setError('Enter a valid amount.'); return; }
     try {
-      if (Number(payForm.amount) > 0) {
-        await api.createPayment({
-          checkin_id: selectedCheckin.id, guest_id: selectedCheckin.guest_id,
-          amount: Number(payForm.amount), payment_method: payForm.payment_method,
-          reference_number: payForm.reference_number || null,
-          description: `Checkout Room ${selectedCheckin.room_number} (${folio.nights}n + ${folio.extras?.length || 0} extras)`,
-        });
-      }
+      await api.createPayment({
+        checkin_id: selectedCheckin.id, guest_id: selectedCheckin.guest_id,
+        amount: Number(payForm.amount), payment_method: payForm.payment_method,
+        reference_number: payForm.reference_number || null,
+        description: `Room ${selectedCheckin.room_number} payment`,
+      });
+      setShowPaymentModal(false);
+      loadFolio(selectedCheckin.id);
+      flash('Payment recorded.');
+    } catch (err) { setError(err.message); }
+  };
+
+  const processCheckout = async () => {
+    setError('');
+    try {
       const checkinId = selectedCheckin.id;
       const roomNum = selectedCheckin.room_number;
       await api.checkOut(checkinId);
@@ -97,7 +106,7 @@ export default function GuestFolio() {
 
       setSelectedCheckin(null); setFolio(null);
       loadCheckins();
-      flash(`Guest checked out from Room ${roomNum}. Receipt ready.`);
+      flash(`Guest checked out from Room ${roomNum}.`);
     } catch (err) { setError(err.message); }
   };
 
@@ -171,7 +180,8 @@ export default function GuestFolio() {
                     </div>
                     <div className="flex gap-2">
                       <button onClick={() => setShowAddModal(true)} className="btn-secondary text-xs">+ Add Charge</button>
-                      <button onClick={openCheckout} className="btn-success text-xs">Check-Out & Pay</button>
+                      <button onClick={openPayment} className="btn-primary text-xs">Record Payment</button>
+                      <button onClick={() => setShowCheckoutModal(true)} className="btn-success text-xs">Check-Out</button>
                     </div>
                   </div>
                 </div>
@@ -296,119 +306,82 @@ export default function GuestFolio() {
           </form>
         </Modal>
 
-        {/* ─── Checkout + Payment Modal ─── */}
-        <Modal isOpen={showCheckoutModal} onClose={() => setShowCheckoutModal(false)} title={`Check-Out — Room ${selectedCheckin?.room_number}`} size="lg">
-          {error && <div className="mb-4 p-2.5 bg-red-50 border border-red-200 rounded text-red-700 text-xs">{error}</div>}
-          {folio && (() => {
-            const paid = folio.paid_total || 0;
-            const balance = folio.balance || 0;
-            const fullyPaid = balance <= 0;
+        {/* ─── Record Payment Modal (standalone) ─── */}
+        <Modal isOpen={showPaymentModal} onClose={() => setShowPaymentModal(false)} title={`Record Payment — Room ${selectedCheckin?.room_number}`} size="md">
+          {error && <div className="mb-3 p-2.5 bg-red-50 border border-red-200 rounded text-red-700 text-xs">{error}</div>}
+          {folio && (
+            <form onSubmit={recordPayment} className="space-y-4">
+              <div className="bg-gray-50 rounded border border-gray-200 p-3 space-y-1 text-sm">
+                <div className="flex justify-between"><span className="text-gray-500">Guest</span><span className="font-medium">{folio.guest?.first_name} {folio.guest?.last_name}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Total Charges</span><span>{formatCurrency(folio.grand_total)}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Total Paid</span><span>{formatCurrency(folio.paid_total || 0)}</span></div>
+                <div className="flex justify-between font-bold border-t border-gray-200 pt-1">
+                  <span className={folio.balance > 0 ? 'text-red-700' : 'text-green-700'}>Balance</span>
+                  <span className={folio.balance > 0 ? 'text-red-700' : 'text-green-700'}>{formatCurrency(folio.balance || 0)}</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label-field">Amount ({settings.currency})</label>
+                  <input type="number" min="1" className="input-field" value={payForm.amount} onChange={(e) => setPayForm(p => ({ ...p, amount: e.target.value }))} required autoFocus />
+                </div>
+                <div>
+                  <label className="label-field">Payment Method</label>
+                  <select className="select-field" value={payForm.payment_method} onChange={(e) => setPayForm(p => ({ ...p, payment_method: e.target.value }))}>
+                    {getPaymentMethods().map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="label-field">Reference No.</label>
+                  <input type="text" className="input-field" placeholder="Transaction ID (optional)" value={payForm.reference_number} onChange={(e) => setPayForm(p => ({ ...p, reference_number: e.target.value }))} />
+                </div>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button type="button" onClick={() => setShowPaymentModal(false)} className="btn-secondary">Cancel</button>
+                <button type="submit" className="btn-primary">Record Payment</button>
+              </div>
+            </form>
+          )}
+        </Modal>
 
+        {/* ─── Check-Out Modal (closure only) ─── */}
+        <Modal isOpen={showCheckoutModal} onClose={() => setShowCheckoutModal(false)} title={`Check-Out — Room ${selectedCheckin?.room_number}`} size="md">
+          {folio && (() => {
+            const balance = folio.balance || 0;
             return (
-              <form onSubmit={processCheckout} className="space-y-4">
-                {/* Bill Summary */}
+              <div className="space-y-4">
                 <div className="bg-gray-50 rounded border border-gray-200 p-4 space-y-2 text-sm">
                   <div className="flex justify-between"><span className="text-gray-500">Guest</span><span className="font-medium text-gray-900">{folio.guest?.first_name} {folio.guest?.last_name}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-500">Room</span><span className="text-gray-900">{folio.room?.room_number} — {folio.room?.room_type}</span></div>
-                  <div className="border-t border-gray-200 pt-2 mt-2 space-y-1">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Accommodation ({folio.nights}n × {formatCurrency(folio.charged_rate || folio.room?.rate_per_night)})</span>
-                      <span className="text-gray-900">{formatCurrency(folio.room_total)}</span>
+                  <div className="flex justify-between"><span className="text-gray-500">Room</span><span>{folio.room?.room_number} — {folio.room?.room_type}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">Nights</span><span>{folio.nights}</span></div>
+                  <div className="border-t border-gray-200 pt-2 space-y-1">
+                    <div className="flex justify-between"><span className="text-gray-500">Total Charges</span><span>{formatCurrency(folio.grand_total)}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">Total Paid</span><span>{formatCurrency(folio.paid_total || 0)}</span></div>
+                    <div className="flex justify-between font-bold border-t border-gray-200 pt-1">
+                      <span className={balance > 0 ? 'text-red-700' : 'text-green-700'}>
+                        {balance > 0 ? 'Outstanding Balance' : 'Status'}
+                      </span>
+                      <span className={balance > 0 ? 'text-red-700' : 'text-green-700'}>
+                        {balance > 0 ? formatCurrency(balance) : 'PAID IN FULL'}
+                      </span>
                     </div>
-                    {folio.has_discount && (
-                      <div className="flex justify-between pl-3 text-green-700 text-xs">
-                        <span>Discount: -{formatCurrency(folio.discount_per_night)}/night{folio.discount_reason ? ` (${folio.discount_reason})` : ''}</span>
-                        <span>-{formatCurrency(folio.total_discount)} saved</span>
-                      </div>
-                    )}
-                    {folio.category_summary?.map(cat => (
-                      <div key={cat.category} className="flex justify-between pl-3"><span className="text-gray-500">{getCatIcon(cat.category)} {getCatLabel(cat.category)} ({cat.count})</span><span className="text-gray-900">{formatCurrency(cat.total)}</span></div>
-                    ))}
-                    {folio.extras_total > 0 && (
-                      <div className="flex justify-between border-t border-gray-200 pt-1"><span className="text-gray-600 font-medium">Extras Subtotal</span><span className="font-medium text-gray-900">{formatCurrency(folio.extras_total)}</span></div>
-                    )}
                   </div>
-                  <div className="flex justify-between pt-2 border-t-2 border-gray-300"><span className="font-bold text-gray-900">NET AMOUNT DUE</span><span className="text-lg font-bold text-gray-900">{formatCurrency(folio.grand_total)}</span></div>
                 </div>
 
-                {/* Payment Status */}
-                {paid > 0 && (
-                  <div className={`p-3 rounded border ${fullyPaid ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className={`text-xs font-semibold uppercase tracking-wide ${fullyPaid ? 'text-green-700' : 'text-blue-700'}`}>
-                        {fullyPaid ? 'Fully Paid at Check-In' : 'Partial Payment Received'}
-                      </span>
-                      {fullyPaid && (
-                        <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
-                      )}
-                    </div>
-                    <div className="space-y-0.5 text-sm">
-                      {folio.payments?.map((p, i) => (
-                        <div key={i} className="flex justify-between text-gray-700">
-                          <span>{p.payment_method}{p.transaction_id ? ` #${p.transaction_id.split('-').pop()}` : ''}</span>
-                          <span className="font-medium">{formatCurrency(p.amount)}</span>
-                        </div>
-                      ))}
-                      <div className="flex justify-between font-semibold text-gray-900 pt-1 border-t border-gray-200">
-                        <span>Total Paid</span>
-                        <span>{formatCurrency(paid)}</span>
-                      </div>
-                      {!fullyPaid && (
-                        <div className="flex justify-between font-bold text-red-700">
-                          <span>Outstanding Balance</span>
-                          <span>{formatCurrency(balance)}</span>
-                        </div>
-                      )}
-                    </div>
+                {balance > 0 && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded">
+                    <p className="text-sm text-amber-800 font-medium">Guest has an outstanding balance of {formatCurrency(balance)}.</p>
+                    <p className="text-xs text-amber-600 mt-1">You can still check out. Use "Record Payment" to collect payment separately.</p>
                   </div>
                 )}
 
-                {paid === 0 && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded">
-                    <span className="text-xs font-semibold text-red-700 uppercase tracking-wide">No Payment Received</span>
-                    <p className="text-sm text-red-600 mt-0.5">Guest has not made any payment. Full amount is due at checkout.</p>
-                  </div>
-                )}
-
-                {/* Payment Form — only show if balance > 0 */}
-                {!fullyPaid ? (
-                  <>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="label-field">Amount to Pay ({settings.currency})</label>
-                        <input type="number" min="0" className="input-field" value={payForm.amount} onChange={(e) => setPayForm(p => ({ ...p, amount: e.target.value }))} />
-                      </div>
-                      <div>
-                        <label className="label-field">Payment Method</label>
-                        <select className="select-field" value={payForm.payment_method} onChange={(e) => setPayForm(p => ({ ...p, payment_method: e.target.value }))}>
-                          {getPaymentMethods().map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                        </select>
-                      </div>
-                      <div className="col-span-2">
-                        <label className="label-field">Reference No.</label>
-                        <input type="text" className="input-field" placeholder="Transaction reference (optional)" value={payForm.reference_number} onChange={(e) => setPayForm(p => ({ ...p, reference_number: e.target.value }))} />
-                      </div>
-                    </div>
-
-                    {Number(payForm.amount) > 0 && Number(payForm.amount) < balance && (
-                      <div className="p-2.5 bg-amber-50 border border-amber-200 rounded text-amber-700 text-xs">
-                        Partial: paying {formatCurrency(payForm.amount)} of {formatCurrency(balance)} balance. Remaining: {formatCurrency(balance - Number(payForm.amount))}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="p-3 bg-gray-50 border border-gray-200 rounded text-center text-sm text-gray-600">
-                    No additional payment needed. Click below to complete checkout.
-                  </div>
-                )}
+                <p className="text-sm text-gray-600">This will free the room and end the guest's stay. A receipt will be generated.</p>
 
                 <div className="flex gap-2 justify-end">
-                  <button type="button" onClick={() => setShowCheckoutModal(false)} className="btn-secondary">Cancel</button>
-                  <button type="submit" className="btn-success">
-                    {fullyPaid ? 'Complete Check-Out' : 'Check-Out & Record Payment'}
-                  </button>
+                  <button onClick={() => setShowCheckoutModal(false)} className="btn-secondary">Cancel</button>
+                  <button onClick={processCheckout} className="btn-success">Confirm Check-Out</button>
                 </div>
-              </form>
+              </div>
             );
           })()}
         </Modal>

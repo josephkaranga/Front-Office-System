@@ -94,7 +94,17 @@ export function SettingsProvider({ children }) {
 
   useEffect(() => {
     document.title = `${settings.hotel_name || 'Hotel'} — Front Office`;
-  }, [settings.hotel_name]);
+    const link = document.querySelector("link[rel='icon']") || document.createElement('link');
+    link.rel = 'icon';
+    if (settings.hotel_logo) {
+      link.href = settings.hotel_logo;
+      link.type = settings.hotel_logo.startsWith('data:image/png') ? 'image/png' : 'image/x-icon';
+    } else {
+      link.href = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231e293b'/><text x='16' y='22' text-anchor='middle' font-family='Arial' font-weight='bold' font-size='14' fill='%23c9a84c'>TV</text></svg>";
+      link.type = 'image/svg+xml';
+    }
+    if (!link.parentNode) document.head.appendChild(link);
+  }, [settings.hotel_name, settings.hotel_logo]);
 
   useEffect(() => {
     const onLogin = () => loadSettings();

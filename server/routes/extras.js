@@ -63,7 +63,7 @@ router.get('/checkin/:checkinId', authenticateToken, async (req, res) => {
         room_charge: chargedRate,
         extras: dayExtras,
         extras_total: dayExtrasTotal,
-        day_total: Number(room.rate_per_night) + dayExtrasTotal,
+        day_total: chargedRate + dayExtrasTotal,
       });
     }
 

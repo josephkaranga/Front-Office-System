@@ -35,7 +35,11 @@ export default function GuestFolio() {
   const [form, setForm] = useState({ category: 'food', item_name: '', quantity: 1, unit_price: '', notes: '' });
   const [payForm, setPayForm] = useState({ amount: '', payment_method: 'cash', reference_number: '' });
 
-  useEffect(() => { loadCheckins(); }, []);
+  useEffect(() => {
+    loadCheckins();
+    const interval = setInterval(loadCheckins, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const loadCheckins = async () => {
     try { setCheckins(await api.getCheckins({ status: 'checked_in', limit: 100 })); }

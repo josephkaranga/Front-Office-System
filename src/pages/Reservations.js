@@ -19,6 +19,8 @@ export default function Reservations() {
   const [success, setSuccess] = useState('');
   const [form, setForm] = useState({ room_id: '', checkin_date: '', checkout_date: '', num_guests: 1, stay_type: 'night', notes: '', car_registration: '' });
   const [newGuest, setNewGuest] = useState({ first_name: '', last_name: '', phone: '', email: '', nationality: '', id_type: 'passport', id_number: '', vip_status: 'regular' });
+  const [duplicates, setDuplicates] = useState([]);
+  const [guestError, setGuestError] = useState('');
 
   useEffect(() => { loadReservations(); loadRooms(); }, [filter]);
 
@@ -61,14 +63,23 @@ export default function Reservations() {
     catch (err) { console.error(err); }
   };
 
-  const handleCreateGuest = async (e) => {
+  const handleCreateGuest = async (e, force = false) => {
     e.preventDefault();
+    setGuestError(''); setDuplicates([]);
     try {
-      const guest = await api.createGuest(newGuest);
+      const guest = await api.createGuest({ ...newGuest, force });
       setSelectedGuest(guest);
       setShowGuestModal(false);
       setNewGuest({ first_name: '', last_name: '', phone: '', email: '', nationality: '', id_type: 'passport', id_number: '' });
-    } catch (err) { setError(err.message); }
+      setDuplicates([]);
+    } catch (err) {
+      if (err.duplicates?.length > 0) {
+        setDuplicates(err.duplicates);
+        setGuestError('A guest with this phone or ID already exists. Select them below or create anyway.');
+      } else {
+        setGuestError(err.message);
+      }
+    }
   };
 
   const statusBadge = { confirmed: 'badge-green', checked_in: 'badge-blue', cancelled: 'badge-red', completed: 'badge-gray' };
@@ -179,8 +190,25 @@ export default function Reservations() {
           </form>
         </Modal>
 
-        <Modal isOpen={showGuestModal} onClose={() => setShowGuestModal(false)} title="Register Guest" size="md">
-          <form onSubmit={handleCreateGuest} className="space-y-3">
+        <Modal isOpen={showGuestModal} onClose={() => { setShowGuestModal(false); setDuplicates([]); setGuestError(''); }} title="Register Guest" size="md">
+          {guestError && <div className="mb-3 p-2.5 bg-red-50 border border-red-200 rounded text-red-700 text-xs">{guestError}</div>}
+          {duplicates.length > 0 && (
+            <div className="mb-3 border border-amber-200 rounded overflow-hidden">
+              <div className="bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 uppercase">Existing guests found — select to use</div>
+              {duplicates.map(d => (
+                <button key={d.id} type="button" onClick={() => {
+                  setSelectedGuest(d); setShowGuestModal(false); setDuplicates([]); setGuestError('');
+                }} className="w-full text-left p-3 border-t border-amber-100 hover:bg-amber-50 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{d.first_name} {d.last_name}</p>
+                    <p className="text-xs text-gray-500">{[d.phone, d.id_number, d.nationality].filter(Boolean).join(' · ')}</p>
+                  </div>
+                  <span className="text-xs text-blue-600 font-medium">Select</span>
+                </button>
+              ))}
+            </div>
+          )}
+          <form onSubmit={(e) => handleCreateGuest(e, duplicates.length > 0)} className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div><label className="label-field">First Name *</label><input type="text" className="input-field" value={newGuest.first_name} onChange={(e) => setNewGuest(p => ({ ...p, first_name: e.target.value }))} required /></div>
               <div><label className="label-field">Last Name *</label><input type="text" className="input-field" value={newGuest.last_name} onChange={(e) => setNewGuest(p => ({ ...p, last_name: e.target.value }))} required /></div>
@@ -213,8 +241,8 @@ export default function Reservations() {
               </div>
             </div>
             <div className="flex gap-2 justify-end">
-              <button type="button" onClick={() => setShowGuestModal(false)} className="btn-secondary">Cancel</button>
-              <button type="submit" className="btn-primary">Register</button>
+              <button type="button" onClick={() => { setShowGuestModal(false); setDuplicates([]); setGuestError(''); }} className="btn-secondary">Cancel</button>
+              <button type="submit" className="btn-primary">{duplicates.length > 0 ? 'Create Anyway' : 'Register'}</button>
             </div>
           </form>
         </Modal>

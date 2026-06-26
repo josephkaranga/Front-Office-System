@@ -37,8 +37,17 @@ export default function GuestFolio() {
 
   useEffect(() => {
     loadCheckins();
-    const interval = setInterval(loadCheckins, 60000);
-    return () => clearInterval(interval);
+    const msUntilMidnight = () => {
+      const now = new Date();
+      const midnight = new Date(now);
+      midnight.setHours(24, 0, 0, 0);
+      return midnight - now + 1000;
+    };
+    let timer = setTimeout(function refresh() {
+      loadCheckins();
+      timer = setTimeout(refresh, msUntilMidnight());
+    }, msUntilMidnight());
+    return () => clearTimeout(timer);
   }, []);
 
   const loadCheckins = async () => {
